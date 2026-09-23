@@ -208,6 +208,25 @@ function minOrderForDrag(market, price, opt, rates, step, limitPct, maxSteps = 2
   return 0;
 }
 
+/**
+ * US trade result in ringgit. You convert MYR->USD to buy (at buyFx) and USD->MYR after selling (at sellFx);
+ * an optional conversion spread (%) makes each conversion slightly worse.
+ * The MYR P/L is split into: stock P/L (valued at sellFx), FX gain/loss on the capital, and conversion cost.
+ * Parts are rounded so they always add up exactly to the total.
+ */
+function myrPnl(cashOut, netIn, buyFx, sellFx, spreadPct = 0) {
+  const validNetIn = Number.isFinite(netIn) && netIn >= 0;
+  if (!isPos(cashOut) || !validNetIn || !isPos(buyFx) || !isPos(sellFx)) return null;
+  const s = Math.max(0, Number.isFinite(spreadPct) ? spreadPct : 0) / 100;
+  const myrOut = round2(cashOut * buyFx * (1 + s));
+  const myrIn = round2(netIn * sellFx * (1 - s));
+  const pnl = round2(myrIn - myrOut);
+  const stock = round2((netIn - cashOut) * sellFx);
+  const fx = round2(cashOut * (sellFx - buyFx));
+  const conversion = round2(pnl - stock - fx);
+  return { myrOut, myrIn, pnl, pct: pnl / myrOut * 100, stock, fx, conversion };
+}
+
 /** Lowest sell price whose net proceeds cover cashOut. 0 if unreachable. */
 function breakEven(market, cashOut, shares, opt, rates) {
   return targetSellPrice(market, cashOut, shares, opt, rates, 0);
@@ -216,7 +235,7 @@ function breakEven(market, cashOut, shares, opt, rates) {
 const api = Object.freeze({
   RATES_AS_OF, DEFAULTS, RATE_NOTES, SST_BURSA,
   isPos, round2, ceil2, bursaFees, usFees, fees, tickFor, roundUpTick, breakEven, targetSellPrice, maxSharesForBudget,
-  roundTripFees, minOrderForDrag
+  roundTripFees, minOrderForDrag, myrPnl
 });
 
 if (typeof module === "object" && module.exports) module.exports = api;

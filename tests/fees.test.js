@@ -280,3 +280,29 @@ test("fee drag: smallest order under the limit", () => {
   assert.equal(FE.minOrderForDrag("bursa", 10.62, { type: "ordinary" }, R, 100, 1), 200);   // 1 lot = 1.06%, 2 lots = 0.69%
   assert.equal(FE.minOrderForDrag("us", 600, { usType: "nms", fx: 4.0 }, R, 1, 1), 1);     // 1 whole share = 0.65%
 });
+
+test("MYR P/L: splits into stock, FX and conversion parts that add up", () => {
+  // Bought with $181.24 at 4.40, sold for $200.00 at 4.00: stock gain, ringgit strengthened (FX loss)
+  const r = FE.myrPnl(181.24, 200, 4.4, 4.0);
+  assert.equal(r.myrOut, 797.46);
+  assert.equal(r.myrIn, 800);
+  assert.equal(r.pnl, 2.54);
+  assert.equal(r.stock, 75.04);                    // (200 - 181.24) x 4.00
+  assert.equal(r.fx, -72.5);                       // 181.24 x (4.00 - 4.40)
+  assert.equal(r.conversion, 0);
+  assert.equal(FE.round2(r.stock + r.fx + r.conversion), r.pnl);
+});
+
+test("MYR P/L: conversion spread and same-rate cases", () => {
+  const r = FE.myrPnl(1000, 1100, 4.2, 4.2, 0.5);
+  assert.equal(r.myrOut, 4221);                    // 1000 x 4.2 x 1.005
+  assert.equal(r.myrIn, 4596.9);                   // 1100 x 4.2 x 0.995
+  assert.equal(r.fx, 0);
+  assert.equal(r.stock, 420);
+  assert.equal(r.conversion, -44.1);
+  assert.equal(FE.round2(r.stock + r.fx + r.conversion), r.pnl);
+  const flat = FE.myrPnl(1000, 1100, 4.2, 4.2);
+  assert.equal(flat.pnl, 420);                     // no spread, same rate: just the USD P/L x rate
+  assert.equal(FE.myrPnl(0, 100, 4, 4), null);
+  assert.equal(FE.myrPnl(100, 100, 0, 4), null);
+});

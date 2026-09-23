@@ -50,6 +50,7 @@ function loadRates(saved){
 function loadInputs(s){
   if(typeof s.fx === "string") $("fx").value = s.fx;
   if(typeof s.targetPct === "string" && /^\d{0,4}(?:\.\d{0,2})?$/.test(s.targetPct)) $("targetPct").value = s.targetPct;
+  if(typeof s.fxCost === "string" && /^\d{0,2}(?:\.\d{0,3})?$/.test(s.fxCost)) $("fxCost").value = s.fxCost;
   if(typeof s.bursaType === "string" && $("bursaType").querySelector(`option[value="${CSS.escape(s.bursaType)}"]`)) $("bursaType").value = s.bursaType;
   if(["nms","otc"].includes(s.usType)) $("usType").value = s.usType;
   $("promo").checked = !!s.promo;
@@ -64,7 +65,7 @@ function save(){
   try{
     localStorage.setItem(STORE_KEY, JSON.stringify({
       market: state.market, calc: state.calc, rates: state.rates,
-      fx: $("fx").value, targetPct: $("targetPct").value, bursaType: $("bursaType").value, usType: $("usType").value,
+      fx: $("fx").value, targetPct: $("targetPct").value, fxCost: $("fxCost").value, bursaType: $("bursaType").value, usType: $("usType").value,
       promo: $("promo").checked, usSst: $("usSst").checked,
       fxMode: fx.mode, fxLive: fx.live
     }));
@@ -153,6 +154,8 @@ function signed(n){ return (n > 0 ? "+" : "") + money(n); }
 function price(n){ return cur() + fmt(n, state.market === "us" && n >= 1 ? 2 : 3, 4); }
 function qtyFmt(n){ return fmt(n, 0, 4); }
 function plural(n, word){ return `${qtyFmt(n)} ${word}${n === 1 ? "" : "s"}`; }
+function rm(n){ return (n < 0 ? "−" : "") + "RM" + fmt(Math.abs(n), 2); }
+function signedRm(n){ return (n > 0 ? "+" : "") + rm(n); }
 function signPct(n){ return `${n >= 0 ? "+" : ""}${fmt(n, 2)}%`; }
 function pnlClass(n){
   if(n > 0) return "pos";
@@ -228,6 +231,7 @@ function options(){
 
 function calcTrade(opt){
   const bp = readNum("buyPrice"), q = readNum("qty"), sp = readNum("sellPrice"), tp = readNum("targetPct");
+  const bfx = readNum("buyFx"), cost = readNum("fxCost");
   const shares = q.v;
   const buyValue = round2(bp.v * shares);
   const hasBuy = buyValue > 0;
@@ -240,10 +244,11 @@ function calcTrade(opt){
 
   renderTradeTable(t);
   renderPnl(t);
+  renderMyr(t, opt, bfx.v, cost.v);
   renderBreakEven(t, bp.v, opt);
   renderTarget(hasBuy, t.cashOut, shares, bp.v, tp.v, opt);
   renderDrag("", bp.v, shares, opt);
-  renderTradeHints(shares, opt, [bp, q, sp, tp].every(x => x.ok));
+  renderTradeHints(shares, opt, [bp, q, sp, tp, bfx, cost].every(x => x.ok));
 }
 
 function renderTradeTable(t){
@@ -275,6 +280,30 @@ function renderPnl(t){
   $("vPnl").textContent = signed(pnl);
   $("tRet").textContent = `${signPct(pnl / t.cashOut * 100)} · gross ${signed(gross)} · fees ${money(t.bf.total + t.sf.total)}`;
   tile.classList.add(pnlClass(pnl));
+}
+
+/**
+ * US only: the trade's result in ringgit. Buy rate defaults to today's rate (then FX gain/loss is zero);
+ * sell rate is today's rate from the USD/MYR field.
+ */
+function renderMyr(t, opt, buyFxIn, costPct){
+  const tile = $("tMyr");
+  tile.hidden = !(state.market === "us" && t.hasBuy && t.hasSell);
+  if(tile.hidden) return;
+  const sellFx = opt.fx;
+  const buyFx = isPos(buyFxIn) ? buyFxIn : sellFx;
+  const r = FE.myrPnl(t.cashOut, t.netIn, buyFx, sellFx, costPct);
+  tile.className = "tile full " + (r ? pnlClass(r.pnl) : "hl");
+  if(!r){
+    $("vMyr").textContent = "—";
+    $("sMyr").textContent = "Enter a valid USD/MYR rate";
+    return;
+  }
+  $("vMyr").textContent = `${signedRm(r.pnl)} (${signPct(r.pct)})`;
+  const parts = [`Paid ${rm(r.myrOut)} · got back ${rm(r.myrIn)}`, `stock ${signedRm(r.stock)}`, `FX ${signedRm(r.fx)}`];
+  if(isPos(costPct)) parts.push(`conversion ${signedRm(r.conversion)}`);
+  if(!isPos(buyFxIn)) parts.push("enter the rate you bought at to see FX gain/loss");
+  $("sMyr").textContent = parts.join(" · ");
 }
 
 function renderBreakEven(t, buyPrice, opt){
@@ -514,6 +543,7 @@ function applyMode(){
   $("optUsType").hidden = !us;
   $("optUsFx").hidden = !us;
   $("usSstWrap").hidden = !us;
+  $("usMyrInputs").hidden = !us;
   const c = us ? "USD" : "RM";
   document.querySelectorAll("label.cur").forEach(l => {
     l.textContent = l.textContent.replace(/ \((RM|USD)\)/, "").replace(/( \(optional\))?$/, m => ` (${c})${m}`);
@@ -534,13 +564,13 @@ document.querySelectorAll("[data-market]").forEach(b => b.addEventListener("clic
   if(state.market === b.dataset.market) return;
   state.market = b.dataset.market;
   // Prices are market-specific; clear them to avoid mixing RM and USD.
-  ["buyPrice","sellPrice","qty","curAvg","curQty","addPrice","addQty","budgetAmt","budgetPrice"].forEach(id => { $(id).value = ""; $(id).classList.remove("bad"); });
+  ["buyPrice","sellPrice","qty","buyFx","curAvg","curQty","addPrice","addQty","budgetAmt","budgetPrice"].forEach(id => { $(id).value = ""; $(id).classList.remove("bad"); });
   applyMode(); update();
 }));
 document.querySelectorAll("[data-calc]").forEach(b => b.addEventListener("click", () => {
   state.calc = b.dataset.calc; applyMode(); update(false);
 }));
-["buyPrice","qty","sellPrice","targetPct","curAvg","curQty","addPrice","addQty","budgetAmt","budgetPrice"].forEach(id => $(id).addEventListener("input", () => update(false)));
+["buyPrice","qty","sellPrice","targetPct","buyFx","fxCost","curAvg","curQty","addPrice","addQty","budgetAmt","budgetPrice"].forEach(id => $(id).addEventListener("input", () => update(false)));
 $("fx").addEventListener("input", () => { fx.mode = "manual"; showFxState(); update(false); });
 $("fxRefresh").addEventListener("click", () => { fx.mode = "live"; fetchFx(true); });
 ["bursaType","usType","promo","usSst"].forEach(id => $(id).addEventListener("change", () => update()));
