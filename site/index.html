@@ -30,7 +30,8 @@
 </div>
 <div class="seg" role="tablist" aria-label="Calculator">
   <button role="tab" id="cTrade" data-calc="trade" aria-selected="true">Trade P/L</button>
-  <button role="tab" id="cAvg" data-calc="avg" aria-selected="false">Average Cost</button>
+  <button role="tab" id="cAvg" data-calc="avg" aria-selected="false">Avg Cost</button>
+  <button role="tab" id="cBudget" data-calc="budget" aria-selected="false">Budget</button>
 </div>
 
 <!-- Shared market options -->
@@ -118,6 +119,29 @@
     <tbody id="avgRows"></tbody>
   </table>
   <div id="avgNote" class="note" hidden></div>
+</section>
+
+<!-- Shares for a budget -->
+<section id="pBudget" class="card" aria-label="Shares for a budget" hidden>
+  <div class="grid">
+    <div><label for="budgetAmt" class="cur">Budget</label><input id="budgetAmt" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+    <div><label for="budgetPrice" class="cur">Buy price</label><input id="budgetPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+  </div>
+
+  <h2>Result</h2>
+  <div class="tiles">
+    <div class="tile main hl" id="tBudget"><div><div class="k">Most you can buy</div><div class="s" id="sBudget">Enter budget and buy price</div></div><div class="v" id="vBudget">—</div></div>
+    <div class="tile"><div class="k">Total cost</div><div class="v" id="vBudCost">—</div><div class="s">Trade value + buy fees</div></div>
+    <div class="tile"><div class="k">Cash left</div><div class="v" id="vBudLeft">—</div></div>
+    <div class="tile full" id="tBudNext"><div class="k" id="kBudNext">Next lot needs</div><div class="v" id="vBudNext">—</div><div class="s" id="sBudNext">Extra cash for one more</div></div>
+  </div>
+
+  <h2>Buy fees</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Amount</th></tr></thead>
+    <tbody id="budgetRows"></tbody>
+  </table>
+  <div id="budgetNote" class="note" hidden></div>
 </section>
 
 <section class="card">

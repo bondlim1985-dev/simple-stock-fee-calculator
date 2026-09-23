@@ -33,7 +33,7 @@ function load(){
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
     if(!s) return;
     if(s.market === "bursa" || s.market === "us") state.market = s.market;
-    if(s.calc === "trade" || s.calc === "avg") state.calc = s.calc;
+    if(s.calc === "trade" || s.calc === "avg" || s.calc === "budget") state.calc = s.calc;
     for(const m of ["bursa","us"]) for(const k in DEFAULTS[m]){
       const v = s.rates && s.rates[m] && s.rates[m][k];
       if(typeof v === "number" && Number.isFinite(v) && v >= 0) state.rates[m][k] = v;
@@ -125,6 +125,7 @@ const fees = (value, shares, side, opt) => FE.fees(state.market, value, shares, 
 const roundUpTick = p => FE.roundUpTick(state.market, p);
 const breakEven = (cashOut, shares, opt) => FE.breakEven(state.market, cashOut, shares, opt, state.rates);
 const targetSellPrice = (cashOut, shares, opt, pct) => FE.targetSellPrice(state.market, cashOut, shares, opt, state.rates, pct);
+const maxShares = (budget, price, opt, step, maxQty) => FE.maxSharesForBudget(state.market, budget, price, opt, state.rates, step, maxQty);
 
 /* ---------- Formatting ---------- */
 const cur = () => state.market === "us" ? "$" : "RM";
@@ -305,6 +306,53 @@ function calcAvg(opt){
   showNote("avgNote", notes, bad || (state.market === "us" && !(opt.fx > 0)));
 }
 
+/** Shares for a budget: Bursa in board lots of 100, US in whole shares, US fractional if under one share. */
+function calcBudget(opt){
+  const b = readNum("budgetAmt"), p = readNum("budgetPrice");
+  const bursa = state.market === "bursa";
+  let r = maxShares(b.v, p.v, opt, bursa ? 100 : 1);
+  let frac = false;
+  if(!bursa && r.shares === 0 && b.v > 0 && p.v > 0){
+    const fr = maxShares(b.v, p.v, opt, 0.0001, 0.9999);
+    if(fr.shares > 0){ r = fr; frac = true; }
+  }
+  const ready = b.v > 0 && p.v > 0;
+  const got = r.shares > 0;
+  $("tBudget").className = "tile main " + (got ? "pos" : "hl");
+  if(!ready){
+    $("vBudget").textContent = "—"; $("sBudget").textContent = "Enter budget and buy price";
+  }else if(got){
+    const lots = r.shares / 100;
+    $("vBudget").textContent = bursa ? `${qtyFmt(lots)} lot${lots === 1 ? "" : "s"}` : frac ? `${fmt(r.shares, 4)} share` : `${qtyFmt(r.shares)} share${r.shares === 1 ? "" : "s"}`;
+    $("sBudget").textContent = bursa ? `${qtyFmt(r.shares)} shares · fees included` : frac ? "Fractional order · fees included" : "Whole shares · fees included";
+  }else{
+    $("vBudget").textContent = bursa ? "0 lots" : "0 shares";
+    $("sBudget").textContent = "Budget too small for one " + (bursa ? "lot" : "share");
+  }
+  $("vBudCost").textContent = got ? money(r.cost) : "—";
+  $("vBudLeft").textContent = ready ? money(r.left) : "—";
+  $("tBudNext").hidden = frac;
+  $("kBudNext").textContent = bursa ? "Next lot needs" : "Next share needs";
+  $("vBudNext").textContent = ready && r.nextShortfall > 0 ? "+" + money(r.nextShortfall) : "—";
+  $("sBudNext").textContent = ready && r.nextShortfall > 0 ? `More cash for ${bursa ? "100 more shares" : "1 more share"}, fees included` : "Extra cash for one more";
+
+  const body = $("budgetRows"); body.replaceChildren();
+  const trV = el("tr"); trV.append(labelCell("Trade value"), valCell(r.value, got)); body.append(trV);
+  for(const [key, label, note] of rowDefs()){
+    if(key === "sec" || key === "taf") continue;
+    const tr = el("tr"); tr.append(labelCell(label, note), valCell(r.fees.lines[key] || 0, got)); body.append(tr);
+  }
+  const trT = el("tr", "sum"); trT.append(labelCell("Total fees"), valCell(r.fees.total, got)); body.append(trT);
+
+  const notes = [];
+  const bad = ![b, p].every(x => x.ok);
+  if(bad) notes.push("Some inputs are invalid — use positive numbers only.");
+  if(!bursa && !(opt.fx > 0)) notes.push("Enter a valid USD/MYR rate for stamp duty.");
+  if(bursa) notes.push("Bursa normal board trades in lots of 100 shares.");
+  if(frac) notes.push("Budget is under one share, so this is a fractional order (no commission, % platform fee). Check the app for any minimum order size.");
+  showNote("budgetNote", notes, bad || (!bursa && !(opt.fx > 0)));
+}
+
 function showNote(id, notes, warn){
   const n = $(id);
   n.hidden = notes.length === 0;
@@ -359,6 +407,7 @@ function applyMode(){
   document.querySelectorAll("[data-calc]").forEach(b => b.setAttribute("aria-selected", String(b.dataset.calc === state.calc)));
   $("pTrade").hidden = state.calc !== "trade";
   $("pAvg").hidden = state.calc !== "avg";
+  $("pBudget").hidden = state.calc !== "budget";
   $("optBursa").hidden = us;
   $("optUsType").hidden = !us;
   $("optUsFx").hidden = !us;
@@ -375,6 +424,7 @@ function update(rerenderRules = true){
   const opt = options();
   calcTrade(opt);
   calcAvg(opt);
+  calcBudget(opt);
   save();
 }
 
@@ -382,13 +432,13 @@ document.querySelectorAll("[data-market]").forEach(b => b.addEventListener("clic
   if(state.market === b.dataset.market) return;
   state.market = b.dataset.market;
   // Prices are market-specific; clear them to avoid mixing RM and USD.
-  ["buyPrice","sellPrice","qty","curAvg","curQty","addPrice","addQty"].forEach(id => { $(id).value = ""; $(id).classList.remove("bad"); });
+  ["buyPrice","sellPrice","qty","curAvg","curQty","addPrice","addQty","budgetAmt","budgetPrice"].forEach(id => { $(id).value = ""; $(id).classList.remove("bad"); });
   applyMode(); update();
 }));
 document.querySelectorAll("[data-calc]").forEach(b => b.addEventListener("click", () => {
   state.calc = b.dataset.calc; applyMode(); update(false);
 }));
-["buyPrice","qty","sellPrice","targetPct","curAvg","curQty","addPrice","addQty"].forEach(id => $(id).addEventListener("input", () => update(false)));
+["buyPrice","qty","sellPrice","targetPct","curAvg","curQty","addPrice","addQty","budgetAmt","budgetPrice"].forEach(id => $(id).addEventListener("input", () => update(false)));
 $("fx").addEventListener("input", () => { fx.mode = "manual"; showFxState(); update(false); });
 $("fxRefresh").addEventListener("click", () => { fx.mode = "live"; fetchFx(true); });
 ["bursaType","usType","promo","usSst"].forEach(id => $(id).addEventListener("change", () => update()));

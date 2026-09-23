@@ -211,3 +211,44 @@ test("target sell price: 0% equals break-even; invalid input returns 0", () => {
   assert.equal(FE.targetSellPrice("bursa", cashOut, 0, opt, R, 10), 0);
   assert.equal(FE.targetSellPrice("bursa", cashOut, 1000, opt, R, -100), 0);
 });
+
+test("budget: max quantity fits, one more step does not", () => {
+  const cases = [
+    ["bursa", 10000, 10.62, 100, 0],        // Maybank lots
+    ["bursa", 2500, 0.455, 100, 0],         // penny stock
+    ["us", 1000, 150, 1, 0],                // whole US shares
+    ["us", 100, 600, 0.0001, 0.9999]        // fractional (< 1 share)
+  ];
+  for (const [market, budget, price, step, maxQty] of cases) {
+    const opt = { type: "ordinary", usType: "nms", fx: 4.0 };
+    const r = FE.maxSharesForBudget(market, budget, price, opt, R, step, maxQty);
+    const cost = q => { const v = FE.round2(q * price); return FE.round2(v + FE.fees(market, v, q, "buy", opt, R).total); };
+    const label = `${market} ${budget} @ ${price}`;
+    assert.ok(r.shares > 0, `${label}: buys something`);
+    assert.equal(r.cost, cost(r.shares), `${label}: cost matches fee engine`);
+    assert.ok(r.cost <= budget, `${label}: fits budget`);
+    assert.ok(cost(Number((r.shares + step).toFixed(6))) > budget, `${label}: one more step does not fit`);
+    assert.equal(r.left, FE.round2(budget - r.cost), `${label}: cash left`);
+  }
+});
+
+test("budget: worked examples", () => {
+  const b = FE.maxSharesForBudget("bursa", 10000, 10.62, { type: "ordinary" }, R, 100);
+  assert.equal(b.shares, 900);                       // 9 lots
+  assert.equal(b.cost, 9576.74);                     // 9,558 + fees 18.74
+  assert.equal(b.left, 423.26);
+  assert.equal(b.nextShortfall, 640.38);             // 1,000 shares cost 10,640.38
+  const u = FE.maxSharesForBudget("us", 1000, 150, { usType: "nms", fx: 4.0 }, R, 1);
+  assert.equal(u.shares, 6);
+  assert.equal(u.cost, 902.28);
+});
+
+test("budget: too small or invalid input buys nothing", () => {
+  const r = FE.maxSharesForBudget("bursa", 50, 10.62, { type: "ordinary" }, R, 100);
+  assert.equal(r.shares, 0);
+  assert.equal(r.left, 50);
+  assert.ok(r.nextShortfall > 0);
+  for (const [budget, price] of [[0, 10], [100, 0], [-5, 10], [NaN, 10]]) {
+    assert.equal(FE.maxSharesForBudget("bursa", budget, price, {}, R, 100).shares, 0);
+  }
+});
