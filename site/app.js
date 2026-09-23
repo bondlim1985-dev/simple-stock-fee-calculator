@@ -41,7 +41,7 @@ function load(){
 }
 function loadRates(saved){
   for(const m of ["bursa","us"]){
-    for(const k in DEFAULTS[m]){
+    for(const k of Object.keys(DEFAULTS[m])){
       const v = saved?.[m]?.[k];
       if(typeof v === "number" && Number.isFinite(v) && v >= 0) state.rates[m][k] = v;
     }
@@ -85,16 +85,17 @@ function fxDateLabel(d){
   return Number.isFinite(t) ? new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : d;
 }
 function showFxState(){
-  if(fx.busy) return fxStatus("Fetching live rate…");
-  if(fx.mode === "manual") return fxStatus("Manual rate — tap Live to use the market rate");
-  if(fx.live) return fxStatus(`ECB reference rate · ${fxDateLabel(fx.live.date)}`, "ok");
-  fxStatus("Default rate — tap Live to fetch");
+  if(fx.busy) fxStatus("Fetching live rate…");
+  else if(fx.mode === "manual") fxStatus("Manual rate — tap Live to use the market rate");
+  else if(fx.live) fxStatus(`ECB reference rate · ${fxDateLabel(fx.live.date)}`, "ok");
+  else fxStatus("Default rate — tap Live to fetch");
 }
 async function fetchFx(force){
   if(fx.busy) return;
   if(!force && fx.live && Date.now() - fx.live.at < FX_TTL_MS){
     if(fx.mode === "live"){ $("fx").value = fx.live.rate.toFixed(4); update(false); }
-    return showFxState();
+    showFxState();
+    return;
   }
   fx.busy = true; $("fxRefresh").disabled = true; showFxState();
   const ctrl = new AbortController();
@@ -140,6 +141,7 @@ const fees = (value, shares, side, opt) => FE.fees(state.market, value, shares, 
 const roundUpTick = p => FE.roundUpTick(state.market, p);
 const breakEven = (cashOut, shares, opt) => FE.breakEven(state.market, cashOut, shares, opt, state.rates);
 const targetSellPrice = (cashOut, shares, opt, pct) => FE.targetSellPrice(state.market, cashOut, shares, opt, state.rates, pct);
+const MSG_INVALID = "Some inputs are invalid — use positive numbers only.";
 const DRAG_LOW = 0.5, DRAG_HIGH = 1;   // % of trade value
 const maxShares = (budget, price, opt, step, maxQty) => FE.maxSharesForBudget(state.market, budget, price, opt, state.rates, step, maxQty);
 
@@ -295,7 +297,7 @@ function renderTradeHints(shares, opt, inputsOk){
   if(!us && shares > 0 && shares % 100 !== 0) notes.push("Bursa normal board trades in lots of 100; odd lots go to the odd-lot market.");
   if(!hasFx(opt)) notes.push("Enter a valid USD/MYR rate — Malaysian stamp duty on US trades cannot be computed without it.");
   if(us && shares > 0 && shares < 1) notes.push("Order < 1 share: no commission; platform fee is % based (max $0.99); settlement, SEC and TAF are not charged.");
-  if(!inputsOk) notes.push("Some inputs are invalid — use positive numbers only.");
+  if(!inputsOk) notes.push(MSG_INVALID);
   showNote("tradeNote", notes, !hasFx(opt) || !inputsOk);
 }
 
@@ -332,7 +334,7 @@ function calcAvg(opt){
 
   const notes = ["Enter your current average as shown in Moomoo (it already includes past buy fees if you use \"average cost\")."];
   const bad = ![ca, cq, np, aq].every(x => x.ok);
-  if(bad) notes.unshift("Some inputs are invalid — use positive numbers only.");
+  if(bad) notes.unshift(MSG_INVALID);
   if(!hasFx(opt)) notes.unshift("Enter a valid USD/MYR rate for stamp duty.");
   showNote("avgNote", notes, bad || !hasFx(opt));
 }
@@ -407,7 +409,7 @@ function calcBudget(opt){
 
   const notes = [];
   const bad = ![b, p].every(x => x.ok);
-  if(bad) notes.push("Some inputs are invalid — use positive numbers only.");
+  if(bad) notes.push(MSG_INVALID);
   if(!hasFx(opt)) notes.push("Enter a valid USD/MYR rate for stamp duty.");
   if(bursa) notes.push("Bursa normal board trades in lots of 100 shares.");
   if(frac) notes.push("Budget is under one share, so this is a fractional order (no commission, % platform fee). Check the app for any minimum order size.");

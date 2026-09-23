@@ -110,7 +110,7 @@ function usFees(value, shares, side, opt, r) {
   }
   const sst = opt.usSst ? round2((commission + platform) * r.sstPct / 100) : 0;
   const lines = { commission, platform, settlement, sec, taf, cat, stamp, sst };
-  return { lines, total: round2(sum(lines)), frac };
+  return { lines, frac, total: round2(sum(lines)) };
 }
 
 function fees(market, value, shares, side, opt, rates) {
@@ -143,7 +143,7 @@ function targetSellPrice(market, cashOut, shares, opt, rates, targetPct) {
   const goal = cashOut * (1 + targetPct / 100);
   const net = p => { const v = p * shares; return v - fees(market, v, shares, "sell", opt, rates).total; };
   let lo = 0, hi = Math.max(0.01, goal / shares * 1.5), guard = 0;
-  while (net(hi) < goal && guard++ < 60) hi *= 2;
+  while (net(hi) < goal && guard < 60) { hi *= 2; guard++; }
   if (net(hi) < goal) return 0;
   for (let i = 0; i < 80; i++) { const mid = (lo + hi) / 2; if (net(mid) >= goal) hi = mid; else lo = mid; }
   return hi;

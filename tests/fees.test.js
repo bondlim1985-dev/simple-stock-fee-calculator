@@ -199,7 +199,8 @@ test("target sell price: lowest price reaching the net profit target", () => {
     assert.ok(net(tp) >= goal - 1e-9, `${label}: reaches target`);
     assert.ok(net(tp - 0.001) < goal, `${label}: is the lowest such price`);
     const tick = FE.roundUpTick(market, tp);
-    assert.ok(tick >= tp && net(tick) >= goal - 1e-9, `${label}: tradable price still meets target`);
+    assert.ok(tick >= tp, `${label}: tradable price is not below the exact price`);
+    assert.ok(net(tick) >= goal - 1e-9, `${label}: tradable price still meets target`);
   }
 });
 
@@ -272,7 +273,8 @@ test("fee drag: smallest order under the limit", () => {
   for (const [market, price, step, opt] of cases) {
     const q = FE.minOrderForDrag(market, price, opt, R, step, 1);
     const pct = n => FE.roundTripFees(market, price, n, opt, R).pct;
-    assert.ok(q > 0 && pct(q) <= 1, `${market} @ ${price}: under 1% at ${q}`);
+    assert.ok(q > 0, `${market} @ ${price}: a qualifying order exists`);
+    assert.ok(pct(q) <= 1, `${market} @ ${price}: under 1% at ${q}`);
     for (let n = step; n < q; n += step) assert.ok(pct(Number(n.toFixed(6))) > 1, `${market} @ ${price}: ${n} is still above 1%`);
   }
   assert.equal(FE.minOrderForDrag("bursa", 10.62, { type: "ordinary" }, R, 100, 1), 200);   // 1 lot = 1.06%, 2 lots = 0.69%
