@@ -21,6 +21,19 @@ test("rounding helpers are cent-safe", () => {
   assert.equal(FE.round2(1.005), 1.01);
 });
 
+test("bursa: matches real Moomoo buy — MAYBANK 1,000 @ 10.62 (27 Aug 2026)", () => {
+  assert.deepEqual(bursa(10620), {
+    lines: { commission: 3.19, platform: 3, clearing: 3.19, stamp: 11, sst: 0 }, total: 20.38
+  });
+});
+
+test("bursa: matches real Moomoo sell — MAYBANK 300 @ 9.80 (24 Jun 2025)", () => {
+  // 0.03% of 2,940 = 0.882: brokerage rounds to nearest (0.88), clearing rounds up (0.89)
+  assert.deepEqual(bursa(2940), {
+    lines: { commission: 0.88, platform: 3, clearing: 0.89, stamp: 3, sst: 0 }, total: 7.77
+  });
+});
+
 test("bursa: RM1,200 ordinary share buy", () => {
   assert.deepEqual(bursa(1200), {
     lines: { commission: 0.36, platform: 3, clearing: 0.36, stamp: 2, sst: 0 }, total: 5.72
