@@ -147,6 +147,33 @@ function targetSellPrice(market, cashOut, shares, opt, rates, targetPct) {
   return hi;
 }
 
+/**
+ * Largest quantity (a multiple of `step`, at most `maxQty`) whose buy value plus buy fees fits in `budget`.
+ * Cost is non-decreasing in quantity, so a binary search over lot counts is exact.
+ * Returns the quantity, its cost breakdown, cash left, and the shortfall for one more step (0 if capped).
+ */
+function maxSharesForBudget(market, budget, price, opt, rates, step, maxQty) {
+  const none = { shares: 0, value: 0, fees: { lines: {}, total: 0 }, cost: 0, left: budget > 0 ? budget : 0, nextShortfall: 0 };
+  if (!(budget > 0) || !(price > 0) || !(step > 0)) return none;
+  const costOf = n => {
+    const shares = Number((n * step).toFixed(6));
+    const value = round2(shares * price);
+    const f = fees(market, value, shares, "buy", opt, rates);
+    return { shares, value, fees: f, cost: round2(value + f.total) };
+  };
+  let hiN = Math.floor(budget / price / step + 1e-9);
+  if (maxQty > 0) hiN = Math.min(hiN, Math.floor(maxQty / step + 1e-9));
+  let lo = 0, hi = hiN;
+  while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (costOf(mid).cost <= budget) lo = mid; else hi = mid - 1; }
+  if (lo === 0) {
+    const first = costOf(1);
+    return { ...none, nextShortfall: maxQty > 0 && step > maxQty ? 0 : round2(first.cost - budget) };
+  }
+  const best = costOf(lo);
+  const capped = maxQty > 0 && (lo + 1) * step > maxQty + 1e-9;
+  return { ...best, left: round2(budget - best.cost), nextShortfall: capped ? 0 : round2(costOf(lo + 1).cost - budget) };
+}
+
 /** Lowest sell price whose net proceeds cover cashOut. 0 if unreachable. */
 function breakEven(market, cashOut, shares, opt, rates) {
   return targetSellPrice(market, cashOut, shares, opt, rates, 0);
@@ -154,7 +181,7 @@ function breakEven(market, cashOut, shares, opt, rates) {
 
 const api = Object.freeze({
   RATES_AS_OF, DEFAULTS, RATE_NOTES, SST_BURSA,
-  round2, ceil2, bursaFees, usFees, fees, tickFor, roundUpTick, breakEven, targetSellPrice
+  round2, ceil2, bursaFees, usFees, fees, tickFor, roundUpTick, breakEven, targetSellPrice, maxSharesForBudget
 });
 
 if (typeof module === "object" && module.exports) module.exports = api;
