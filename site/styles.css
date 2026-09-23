@@ -1,16 +1,16 @@
 :root{
   --bg:#f2f5f9;--card:#fff;--ink:#14213a;--muted:#66728a;--faint:#8e98ab;--line:#e1e7ef;--field:#fff;--field-line:#cdd6e2;
   --brand:#0f2b4c;--brand-ink:#fff;--accent:#1f9d74;--soft:#f6f8fb;
-  --pos:#12804a;--pos-bg:#e8f7ee;--neg:#c42b3f;--neg-bg:#fdecee;--hl:#a02b62;--hl-bg:#fdf0f6;
+  --pos:#12804a;--pos-bg:#e8f7ee;--neg:#c42b3f;--neg-bg:#fdecee;--hl:#a02b62;--hl-bg:#fdf0f6;--warn:#8a5a00;--warn-bg:#fff4d6;
   --radius:12px;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#0c1320;--card:#141d2c;--ink:#e6ebf3;--muted:#98a3b6;--faint:#6f7a8e;--line:#243145;--field:#0f1826;--field-line:#2d3b52;
-  --brand:#3d7fd1;--brand-ink:#fff;--soft:#101929;--pos:#4cc98a;--pos-bg:#12301f;--neg:#ff7d8c;--neg-bg:#3a1820;--hl:#f08cbb;--hl-bg:#34172a;
+  --brand:#3d7fd1;--brand-ink:#fff;--soft:#101929;--pos:#4cc98a;--pos-bg:#12301f;--neg:#ff7d8c;--neg-bg:#3a1820;--hl:#f08cbb;--hl-bg:#34172a;--warn:#f5c065;--warn-bg:#3a2d0c;
 }}
 :root[data-theme="dark"]{
   --bg:#0c1320;--card:#141d2c;--ink:#e6ebf3;--muted:#98a3b6;--faint:#6f7a8e;--line:#243145;--field:#0f1826;--field-line:#2d3b52;
-  --brand:#3d7fd1;--brand-ink:#fff;--soft:#101929;--pos:#4cc98a;--pos-bg:#12301f;--neg:#ff7d8c;--neg-bg:#3a1820;--hl:#f08cbb;--hl-bg:#34172a;
+  --brand:#3d7fd1;--brand-ink:#fff;--soft:#101929;--pos:#4cc98a;--pos-bg:#12301f;--neg:#ff7d8c;--neg-bg:#3a1820;--hl:#f08cbb;--hl-bg:#34172a;--warn:#f5c065;--warn-bg:#3a2d0c;
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
@@ -45,7 +45,8 @@ input.bad{border-color:var(--neg);background:var(--neg-bg)}
 .tile.pos{background:var(--pos-bg);border-color:transparent;color:var(--pos)}
 .tile.neg{background:var(--neg-bg);border-color:transparent;color:var(--neg)}
 .tile.hl{background:var(--hl-bg);border-color:transparent;color:var(--hl)}
-.tile.pos .k,.tile.neg .k,.tile.hl .k,.tile.pos .s,.tile.neg .s,.tile.hl .s{color:inherit;opacity:.8}
+.tile.warn{background:var(--warn-bg);border-color:transparent;color:var(--warn)}
+.tile.pos .k,.tile.neg .k,.tile.hl .k,.tile.warn .k,.tile.pos .s,.tile.neg .s,.tile.hl .s,.tile.warn .s{color:inherit;opacity:.8}
 h2{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:14px 0 6px}
 table{width:100%;border-collapse:collapse;font-size:12.5px}
 th,td{padding:5px 0;text-align:right;white-space:nowrap}

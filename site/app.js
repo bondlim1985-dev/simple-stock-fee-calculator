@@ -125,6 +125,7 @@ const fees = (value, shares, side, opt) => FE.fees(state.market, value, shares, 
 const roundUpTick = p => FE.roundUpTick(state.market, p);
 const breakEven = (cashOut, shares, opt) => FE.breakEven(state.market, cashOut, shares, opt, state.rates);
 const targetSellPrice = (cashOut, shares, opt, pct) => FE.targetSellPrice(state.market, cashOut, shares, opt, state.rates, pct);
+const DRAG_LOW = 0.5, DRAG_HIGH = 1;   // % of trade value
 const maxShares = (budget, price, opt, step, maxQty) => FE.maxSharesForBudget(state.market, budget, price, opt, state.rates, step, maxQty);
 
 /* ---------- Formatting ---------- */
@@ -233,6 +234,7 @@ function calcTrade(opt){
     $("vBe").textContent = "—"; $("sBe").textContent = "Covers buy + sell fees";
   }
   renderTarget(hasBuy, cashOut, shares, bp.v, tp.v, opt);
+  renderDrag("", bp.v, shares, opt);
 
   // Hints / warnings
   $("qtyHint").textContent = state.market === "bursa"
@@ -306,6 +308,33 @@ function calcAvg(opt){
   showNote("avgNote", notes, bad || (state.market === "us" && !(opt.fx > 0)));
 }
 
+/**
+ * Fee drag card: round-trip fees (buy now + sell later at the same price) as % of the trade.
+ * Green <= 0.5%, amber <= 1%, red above; when above 1%, suggests the smallest order that gets under it.
+ */
+function renderDrag(prefix, price, shares, opt){
+  const tile = $("t" + prefix + "Drag");
+  const rt = FE.roundTripFees(state.market, price, shares, opt, state.rates);
+  tile.hidden = !(rt.value > 0);
+  if(tile.hidden) return;
+  const level = rt.pct <= DRAG_LOW ? "Low" : rt.pct <= DRAG_HIGH ? "Moderate" : "High";
+  tile.className = "tile full " + (level === "Low" ? "pos" : level === "Moderate" ? "warn" : "neg");
+  $("k" + prefix + "Drag").textContent = `Fee drag · ${level}`;
+  $("v" + prefix + "Drag").textContent = `${fmt(rt.pct, 2)}% · ${money(rt.total)}`;
+  const parts = [`Buy + sell fees on ${money(rt.value)}; price must rise ${fmt(rt.pct, 2)}% just to cover them`];
+  if(rt.pct > DRAG_HIGH){
+    const bursa = state.market === "bursa";
+    const minQ = FE.minOrderForDrag(state.market, price, opt, state.rates, bursa ? 100 : 1, DRAG_HIGH);
+    if(minQ > shares){
+      const size = bursa ? `${qtyFmt(minQ / 100)} lot${minQ === 100 ? "" : "s"}` : `${qtyFmt(minQ)} share${minQ === 1 ? "" : "s"}`;
+      parts.push(`buy at least ${size} (${money(round2(minQ * price))}) to keep fees under ${DRAG_HIGH}%`);
+    }else if(!minQ){
+      parts.push(`fees stay above ${DRAG_HIGH}% at this price`);
+    }
+  }
+  $("s" + prefix + "Drag").textContent = parts.join(" · ");
+}
+
 /** Shares for a budget: Bursa in board lots of 100, US in whole shares, US fractional if under one share. */
 function calcBudget(opt){
   const b = readNum("budgetAmt"), p = readNum("budgetPrice");
@@ -332,6 +361,7 @@ function calcBudget(opt){
   $("vBudCost").textContent = got ? money(r.cost) : "—";
   $("vBudLeft").textContent = ready ? money(r.left) : "—";
   $("tBudNext").hidden = frac;
+  renderDrag("Bud", got ? p.v : 0, r.shares, opt);
   $("kBudNext").textContent = bursa ? "Next lot needs" : "Next share needs";
   $("vBudNext").textContent = ready && r.nextShortfall > 0 ? "+" + money(r.nextShortfall) : "—";
   $("sBudNext").textContent = ready && r.nextShortfall > 0 ? `More cash for ${bursa ? "100 more shares" : "1 more share"}, fees included` : "Extra cash for one more";

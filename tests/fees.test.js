@@ -252,3 +252,29 @@ test("budget: too small or invalid input buys nothing", () => {
     assert.equal(FE.maxSharesForBudget("bursa", budget, price, {}, R, 100).shares, 0);
   }
 });
+
+test("fee drag: round-trip fees as % of trade value", () => {
+  const b = FE.roundTripFees("bursa", 10.62, 1000, { type: "ordinary" }, R);
+  assert.equal(b.value, 10620);
+  assert.equal(b.total, 40.76);                      // 20.38 buy + 20.38 sell
+  assert.ok(Math.abs(b.pct - 40.76 / 10620 * 100) < 1e-9);
+  const f = FE.roundTripFees("us", 600, 0.3, { usType: "nms", fx: 4.0 }, R);
+  assert.equal(f.total, 2.48);                       // 1.24 + 1.24, the fractional VOO example
+  assert.equal(FE.roundTripFees("bursa", 0, 100, {}, R).pct, 0);
+});
+
+test("fee drag: smallest order under the limit", () => {
+  const cases = [
+    ["bursa", 10.62, 100, { type: "ordinary" }],
+    ["bursa", 0.455, 100, { type: "ordinary" }],
+    ["us", 150, 1, { usType: "nms", fx: 4.0 }]
+  ];
+  for (const [market, price, step, opt] of cases) {
+    const q = FE.minOrderForDrag(market, price, opt, R, step, 1);
+    const pct = n => FE.roundTripFees(market, price, n, opt, R).pct;
+    assert.ok(q > 0 && pct(q) <= 1, `${market} @ ${price}: under 1% at ${q}`);
+    for (let n = step; n < q; n += step) assert.ok(pct(Number(n.toFixed(6))) > 1, `${market} @ ${price}: ${n} is still above 1%`);
+  }
+  assert.equal(FE.minOrderForDrag("bursa", 10.62, { type: "ordinary" }, R, 100, 1), 200);   // 1 lot = 1.06%, 2 lots = 0.69%
+  assert.equal(FE.minOrderForDrag("us", 600, { usType: "nms", fx: 4.0 }, R, 1, 1), 1);     // 1 whole share = 0.65%
+});

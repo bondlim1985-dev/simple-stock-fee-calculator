@@ -174,6 +174,38 @@ function maxSharesForBudget(market, budget, price, opt, rates, step, maxQty) {
   return { ...best, left: round2(budget - best.cost), nextShortfall: capped ? 0 : round2(costOf(lo + 1).cost - budget) };
 }
 
+/**
+ * Fee drag: buy fees plus the sell fees you would pay selling the same quantity at the same price,
+ * as a % of trade value. This is the price rise needed just to cover fees.
+ */
+function roundTripFees(market, price, shares, opt, rates) {
+  const value = round2(price * shares);
+  if (!(value > 0)) return { value: 0, buy: 0, sell: 0, total: 0, pct: 0 };
+  const buy = fees(market, value, shares, "buy", opt, rates).total;
+  const sell = fees(market, value, shares, "sell", opt, rates).total;
+  const total = round2(buy + sell);
+  return { value, buy, sell, total, pct: total / value * 100 };
+}
+
+/**
+ * Smallest quantity (a multiple of `step`) whose fee drag is at or below `limitPct`.
+ * Fee drag is not strictly monotonic (stamp duty steps), so this scans upward; 0 if not reached within maxSteps.
+ */
+function minOrderForDrag(market, price, opt, rates, step, limitPct, maxSteps = 200000) {
+  if (!(price > 0) || !(step > 0) || !(limitPct > 0)) return 0;
+  // Skip ahead: fixed per-order fees alone need value >= fixed / limit, so start near there.
+  let n = 1;
+  const probe = roundTripFees(market, price, step, opt, rates);
+  if (probe.pct <= limitPct) return step;
+  const start = Math.floor(probe.total / (limitPct / 100) / price / step / 4);
+  if (start > 1) n = start;
+  for (let i = 0; i < maxSteps; i++, n++) {
+    const q = Number((n * step).toFixed(6));
+    if (roundTripFees(market, price, q, opt, rates).pct <= limitPct) return q;
+  }
+  return 0;
+}
+
 /** Lowest sell price whose net proceeds cover cashOut. 0 if unreachable. */
 function breakEven(market, cashOut, shares, opt, rates) {
   return targetSellPrice(market, cashOut, shares, opt, rates, 0);
@@ -181,7 +213,8 @@ function breakEven(market, cashOut, shares, opt, rates) {
 
 const api = Object.freeze({
   RATES_AS_OF, DEFAULTS, RATE_NOTES, SST_BURSA,
-  round2, ceil2, bursaFees, usFees, fees, tickFor, roundUpTick, breakEven, targetSellPrice, maxSharesForBudget
+  round2, ceil2, bursaFees, usFees, fees, tickFor, roundUpTick, breakEven, targetSellPrice, maxSharesForBudget,
+  roundTripFees, minOrderForDrag
 });
 
 if (typeof module === "object" && module.exports) module.exports = api;
