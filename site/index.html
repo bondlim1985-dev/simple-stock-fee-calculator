@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src 'self' https://api.frankfurter.dev; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0f2b4c">
+<title>Moomoo Fee Calculator</title>
+<meta name="description" content="Moomoo Malaysia fee calculator for Bursa and US stocks">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Fee Calc">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Moomoo Fee Calculator</h1>
+  <span class="asof">Moomoo MY schedule · Sep 2026</span>
+</header>
+
+<div class="seg" role="tablist" aria-label="Market">
+  <button role="tab" id="mkBursa" data-market="bursa" aria-selected="true">🇲🇾 Bursa · MYR</button>
+  <button role="tab" id="mkUs" data-market="us" aria-selected="false">🇺🇸 US · USD</button>
+</div>
+<div class="seg" role="tablist" aria-label="Calculator">
+  <button role="tab" id="cTrade" data-calc="trade" aria-selected="true">Trade P/L</button>
+  <button role="tab" id="cAvg" data-calc="avg" aria-selected="false">Average Cost</button>
+</div>
+
+<!-- Shared market options -->
+<section class="card" aria-label="Order settings">
+  <div class="grid">
+    <div id="optBursa" class="full">
+      <label for="bursaType">Product type</label>
+      <select id="bursaType">
+        <option value="ordinary">Ordinary shares</option>
+        <option value="etf">ETF (stamp duty exempt, SST applies)</option>
+        <option value="reit">REIT (SST applies)</option>
+        <option value="warrant">Warrant / structured warrant (SST applies)</option>
+        <option value="other">Rights / business trust / stapled (SST applies)</option>
+      </select>
+    </div>
+    <div id="optUsType" class="full" hidden>
+      <label for="usType">Where the stock trades <span class="lbl-note">(sets CAT fee)</span></label>
+      <select id="usType">
+        <option value="nms">NYSE / Nasdaq (NMS) — most stocks</option>
+        <option value="otc">Over-the-counter (OTC)</option>
+      </select>
+    </div>
+    <div id="optUsFx" class="full" hidden>
+      <label for="fx">USD/MYR rate <span class="lbl-note">(for MY stamp duty)</span></label>
+      <div class="fx-row">
+        <input id="fx" inputmode="decimal" autocomplete="off" value="4.20">
+        <button type="button" class="btn fx-btn" id="fxRefresh" aria-label="Fetch live USD/MYR rate">↻ Live</button>
+      </div>
+      <div class="hint" id="fxStatus" aria-live="polite">Default rate — tap Live to fetch</div>
+    </div>
+  </div>
+  <div class="opts">
+    <label class="check"><input type="checkbox" id="promo"> 0% commission promo</label>
+    <label class="check" id="usSstWrap" hidden><input type="checkbox" id="usSst"> Add 8% SST on fees</label>
+  </div>
+</section>
+
+<!-- Trade calculator -->
+<section id="pTrade" class="card" aria-label="Trade calculator">
+  <div class="grid">
+    <div><label for="buyPrice" class="cur">Buy price</label><input id="buyPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+    <div><label for="qty">Quantity (shares)</label><input id="qty" inputmode="decimal" autocomplete="off" placeholder="0"><div class="hint" id="qtyHint"></div></div>
+    <div class="full"><label for="sellPrice" class="cur">Sell price (optional)</label><input id="sellPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+  </div>
+
+  <h2>Result</h2>
+  <div class="tiles">
+    <div class="tile main" id="tPnl"><div><div class="k">Net profit / loss</div><div class="s" id="tRet">Enter a sell price</div></div><div class="v" id="vPnl">—</div></div>
+    <div class="tile"><div class="k">Total cash out</div><div class="v" id="vCash">—</div><div class="s">Buy value + buy fees</div></div>
+    <div class="tile"><div class="k">Net received</div><div class="v" id="vNet">—</div><div class="s">Sell value − sell fees</div></div>
+    <div class="tile hl full"><div class="k">Break-even sell price</div><div class="v" id="vBe">—</div><div class="s" id="sBe">Covers buy + sell fees</div></div>
+  </div>
+
+  <h2>Fee breakdown</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Buy</th><th>Sell</th></tr></thead>
+    <tbody id="tradeRows"></tbody>
+  </table>
+  <div id="tradeNote" class="note" hidden></div>
+</section>
+
+<!-- Average cost calculator -->
+<section id="pAvg" class="card" aria-label="Average cost calculator" hidden>
+  <div class="grid">
+    <div><label for="curAvg" class="cur">Current avg price</label><input id="curAvg" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+    <div><label for="curQty">Current shares</label><input id="curQty" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+    <div><label for="addPrice" class="cur">New buy price</label><input id="addPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+    <div><label for="addQty">New shares</label><input id="addQty" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+  </div>
+
+  <h2>Result</h2>
+  <div class="tiles">
+    <div class="tile main hl" id="tAvg"><div><div class="k">New average cost</div><div class="s" id="sAvg">Incl. new buy fees</div></div><div class="v" id="vAvg">—</div></div>
+    <div class="tile"><div class="k">Total shares</div><div class="v" id="vTotQty">0</div></div>
+    <div class="tile"><div class="k">Total cost</div><div class="v" id="vTotCost">—</div></div>
+    <div class="tile"><div class="k">Current cost</div><div class="v" id="vCurCost">—</div></div>
+    <div class="tile"><div class="k">New buy cash out</div><div class="v" id="vAddCash">—</div></div>
+  </div>
+
+  <h2>New buy fees</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Amount</th></tr></thead>
+    <tbody id="avgRows"></tbody>
+  </table>
+  <div id="avgNote" class="note" hidden></div>
+</section>
+
+<section class="card">
+  <details id="rateBox">
+    <summary>Fee schedule &amp; editable rates</summary>
+    <ul class="rules" id="rules"></ul>
+    <div class="rates" id="rateFields"></div>
+    <button type="button" class="btn" id="resetRates">Reset to defaults</button>
+  </details>
+</section>
+
+<footer>
+  Estimates only, based on Moomoo Securities Malaysia's published fee schedule. Regulatory rates (SEC, TAF, CAT) and FX change;
+  verify against your contract note. Your inputs never leave this device; the only network request fetches the USD/MYR rate.
+</footer>
+</div>
+
+<script src="fees.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

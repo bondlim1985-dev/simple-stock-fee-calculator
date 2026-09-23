@@ -1,0 +1,11 @@
+{
+  "name": "simple-stock-fee-calculator",
+  "private": true,
+  "description": "Moomoo Malaysia fee calculator for Bursa and US stocks",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
