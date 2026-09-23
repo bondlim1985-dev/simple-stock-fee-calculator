@@ -163,7 +163,7 @@ footer{font-size:10.5px;color:var(--faint);margin:12px 4px 0;line-height:1.5}
 
   <h2>Result</h2>
   <div class="tiles">
-    <div class="tile main hl"><div><div class="k">New average cost</div><div class="s" id="sAvg">Incl. new buy fees</div></div><div class="v" id="vAvg">—</div></div>
+    <div class="tile main hl" id="tAvg"><div><div class="k">New average cost</div><div class="s" id="sAvg">Incl. new buy fees</div></div><div class="v" id="vAvg">—</div></div>
     <div class="tile"><div class="k">Total shares</div><div class="v" id="vTotQty">0</div></div>
     <div class="tile"><div class="k">Total cost</div><div class="v" id="vTotCost">—</div></div>
     <div class="tile"><div class="k">Current cost</div><div class="v" id="vCurCost">—</div></div>
@@ -500,10 +500,16 @@ function calcAvg(opt){
   if(totQty > 0 && totCost > 0){
     const avg = totCost / totQty;
     $("vAvg").textContent = price(avg);
-    $("sAvg").textContent = ca.v > 0
-      ? `${avg <= ca.v ? "▼" : "▲"} ${fmt(Math.abs(avg / ca.v - 1) * 100, 2)}% vs current · incl. new buy fees`
-      : "Incl. new buy fees";
+    // Green when the new average sits below the new buy price (≈ market): the whole position is in profit at that price.
+    const inProfit = np.v > 0 && avg < np.v;
+    $("tAvg").className = "tile main " + (inProfit ? "pos" : "hl");
+    const parts = [];
+    if(ca.v > 0) parts.push(`${avg <= ca.v ? "▼" : "▲"} ${fmt(Math.abs(avg / ca.v - 1) * 100, 2)}% vs current avg`);
+    if(np.v > 0) { const g = (np.v / avg - 1) * 100; parts.push(`position ${g >= 0 ? "+" : "−"}${fmt(Math.abs(g), 2)}% at new buy price`); }
+    parts.push("incl. new buy fees");
+    $("sAvg").textContent = parts.join(" · ");
   }else{
+    $("tAvg").className = "tile main hl";
     $("vAvg").textContent = "—"; $("sAvg").textContent = "Incl. new buy fees";
   }
 
