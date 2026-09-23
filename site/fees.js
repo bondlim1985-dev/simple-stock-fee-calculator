@@ -63,6 +63,8 @@ const EPS = 1e-9;
 const round2 = n => Math.round((n + EPS) * 100) / 100;   // half-up to cent
 const ceil2 = n => Math.ceil(n * 100 - 1e-7) / 100;      // up to cent, tolerant of FP noise
 const sum = o => Object.values(o).reduce((a, b) => a + b, 0);
+/** True only for finite numbers above zero (rejects NaN, Infinity, undefined, 0 and negatives). */
+const isPos = n => Number.isFinite(n) && n > 0;
 
 /* ---------- Fee engines ---------- */
 /**
@@ -71,7 +73,7 @@ const sum = o => Object.values(o).reduce((a, b) => a + b, 0);
  * @param {object} r      bursa rate table
  */
 function bursaFees(value, opt, r) {
-  if (!(value > 0)) return { lines: {}, total: 0 };
+  if (!isPos(value)) return { lines: {}, total: 0 };
   // Rounding verified against real Moomoo MY trades: brokerage to nearest sen, clearing up to next sen.
   const commission = opt.promo ? 0 : round2(value * r.commPct / 100);
   const platform = r.platform;
@@ -90,7 +92,7 @@ function bursaFees(value, opt, r) {
  * @param {object} r       us rate table
  */
 function usFees(value, shares, side, opt, r) {
-  if (!(value > 0) || !(shares > 0)) return { lines: {}, total: 0, frac: false };
+  if (!isPos(value) || !isPos(shares)) return { lines: {}, total: 0, frac: false };
   const frac = shares < 1;
   const sell = side === "sell";
   // Orders < 1 share: no commission (verified on a real 0.3-share sell, Aug 2026).
@@ -102,13 +104,13 @@ function usFees(value, shares, side, opt, r) {
   const taf = sell && !frac ? Math.min(Math.max(ceil2(shares * r.taf), r.tafMin), r.tafMax) : 0;
   const cat = round2(shares * (opt.usType === "otc" ? r.catOtc : r.catNms));
   let stamp = 0;
-  if (opt.fx > 0) {
+  if (isPos(opt.fx)) {
     const stampMyr = Math.min(Math.ceil(value * opt.fx / 1000 - EPS) * r.stampPer1k, r.stampCap);
     stamp = round2(stampMyr / opt.fx);
   }
   const sst = opt.usSst ? round2((commission + platform) * r.sstPct / 100) : 0;
   const lines = { commission, platform, settlement, sec, taf, cat, stamp, sst };
-  return { lines, total: round2(sum(lines)), frac };
+  return { lines, frac, total: round2(sum(lines)) };
 }
 
 function fees(market, value, shares, side, opt, rates) {
@@ -137,11 +139,11 @@ function roundUpTick(market, p) {
  * Profit % is measured on total cash out (buy value + buy fees), same as the P/L return. 0 if unreachable.
  */
 function targetSellPrice(market, cashOut, shares, opt, rates, targetPct) {
-  if (!(cashOut > 0) || !(shares > 0) || !(targetPct > -100)) return 0;
+  if (!isPos(cashOut) || !isPos(shares) || !isPos(targetPct + 100)) return 0;
   const goal = cashOut * (1 + targetPct / 100);
   const net = p => { const v = p * shares; return v - fees(market, v, shares, "sell", opt, rates).total; };
   let lo = 0, hi = Math.max(0.01, goal / shares * 1.5), guard = 0;
-  while (net(hi) < goal && guard++ < 60) hi *= 2;
+  while (net(hi) < goal && guard < 60) { hi *= 2; guard++; }
   if (net(hi) < goal) return 0;
   for (let i = 0; i < 80; i++) { const mid = (lo + hi) / 2; if (net(mid) >= goal) hi = mid; else lo = mid; }
   return hi;
@@ -153,8 +155,8 @@ function targetSellPrice(market, cashOut, shares, opt, rates, targetPct) {
  * Returns the quantity, its cost breakdown, cash left, and the shortfall for one more step (0 if capped).
  */
 function maxSharesForBudget(market, budget, price, opt, rates, step, maxQty) {
-  const none = { shares: 0, value: 0, fees: { lines: {}, total: 0 }, cost: 0, left: budget > 0 ? budget : 0, nextShortfall: 0 };
-  if (!(budget > 0) || !(price > 0) || !(step > 0)) return none;
+  const none = { shares: 0, value: 0, fees: { lines: {}, total: 0 }, cost: 0, left: isPos(budget) ? budget : 0, nextShortfall: 0 };
+  if (!isPos(budget) || !isPos(price) || !isPos(step)) return none;
   const costOf = n => {
     const shares = Number((n * step).toFixed(6));
     const value = round2(shares * price);
@@ -174,6 +176,38 @@ function maxSharesForBudget(market, budget, price, opt, rates, step, maxQty) {
   return { ...best, left: round2(budget - best.cost), nextShortfall: capped ? 0 : round2(costOf(lo + 1).cost - budget) };
 }
 
+/**
+ * Fee drag: buy fees plus the sell fees you would pay selling the same quantity at the same price,
+ * as a % of trade value. This is the price rise needed just to cover fees.
+ */
+function roundTripFees(market, price, shares, opt, rates) {
+  const value = round2(price * shares);
+  if (!isPos(value)) return { value: 0, buy: 0, sell: 0, total: 0, pct: 0 };
+  const buy = fees(market, value, shares, "buy", opt, rates).total;
+  const sell = fees(market, value, shares, "sell", opt, rates).total;
+  const total = round2(buy + sell);
+  return { value, buy, sell, total, pct: total / value * 100 };
+}
+
+/**
+ * Smallest quantity (a multiple of `step`) whose fee drag is at or below `limitPct`.
+ * Fee drag is not strictly monotonic (stamp duty steps), so this scans upward; 0 if not reached within maxSteps.
+ */
+function minOrderForDrag(market, price, opt, rates, step, limitPct, maxSteps = 200000) {
+  if (!isPos(price) || !isPos(step) || !isPos(limitPct)) return 0;
+  // Skip ahead: fixed per-order fees alone need value >= fixed / limit, so start near there.
+  let n = 1;
+  const probe = roundTripFees(market, price, step, opt, rates);
+  if (probe.pct <= limitPct) return step;
+  const start = Math.floor(probe.total / (limitPct / 100) / price / step / 4);
+  if (start > 1) n = start;
+  for (let i = 0; i < maxSteps; i++, n++) {
+    const q = Number((n * step).toFixed(6));
+    if (roundTripFees(market, price, q, opt, rates).pct <= limitPct) return q;
+  }
+  return 0;
+}
+
 /** Lowest sell price whose net proceeds cover cashOut. 0 if unreachable. */
 function breakEven(market, cashOut, shares, opt, rates) {
   return targetSellPrice(market, cashOut, shares, opt, rates, 0);
@@ -181,7 +215,8 @@ function breakEven(market, cashOut, shares, opt, rates) {
 
 const api = Object.freeze({
   RATES_AS_OF, DEFAULTS, RATE_NOTES, SST_BURSA,
-  round2, ceil2, bursaFees, usFees, fees, tickFor, roundUpTick, breakEven, targetSellPrice, maxSharesForBudget
+  isPos, round2, ceil2, bursaFees, usFees, fees, tickFor, roundUpTick, breakEven, targetSellPrice, maxSharesForBudget,
+  roundTripFees, minOrderForDrag
 });
 
 if (typeof module === "object" && module.exports) module.exports = api;
