@@ -73,7 +73,8 @@
   <div class="grid">
     <div><label for="buyPrice" class="cur">Buy price</label><input id="buyPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
     <div><label for="qty">Quantity (shares)</label><input id="qty" inputmode="decimal" autocomplete="off" placeholder="0"><div class="hint" id="qtyHint"></div></div>
-    <div class="full"><label for="sellPrice" class="cur">Sell price (optional)</label><input id="sellPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+    <div><label for="sellPrice" class="cur">Sell price (optional)</label><input id="sellPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+    <div><label for="targetPct">Target profit % <span class="lbl-note">(optional)</span></label><input id="targetPct" inputmode="decimal" autocomplete="off" placeholder="e.g. 10"></div>
   </div>
 
   <h2>Result</h2>
@@ -82,6 +83,7 @@
     <div class="tile"><div class="k">Total cash out</div><div class="v" id="vCash">—</div><div class="s">Buy value + buy fees</div></div>
     <div class="tile"><div class="k">Net received</div><div class="v" id="vNet">—</div><div class="s">Sell value − sell fees</div></div>
     <div class="tile hl full"><div class="k">Break-even sell price</div><div class="v" id="vBe">—</div><div class="s" id="sBe">Covers buy + sell fees</div></div>
+    <div class="tile pos full" id="tTarget" hidden><div class="k" id="kTarget">Target sell price</div><div class="v" id="vTarget">—</div><div class="s" id="sTarget"></div></div>
   </div>
 
   <h2>Fee breakdown</h2>

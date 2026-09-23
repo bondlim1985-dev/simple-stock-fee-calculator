@@ -39,6 +39,7 @@ function load(){
       if(typeof v === "number" && Number.isFinite(v) && v >= 0) state.rates[m][k] = v;
     }
     if(typeof s.fx === "string") $("fx").value = s.fx;
+    if(typeof s.targetPct === "string" && /^\d{0,4}(\.\d{0,2})?$/.test(s.targetPct)) $("targetPct").value = s.targetPct;
     if(s.fxMode === "manual" || s.fxMode === "live") fx.mode = s.fxMode;
     if(s.fxLive && validFx(s.fxLive.rate) && typeof s.fxLive.date === "string" && typeof s.fxLive.at === "number") fx.live = s.fxLive;
     if(typeof s.bursaType === "string" && $("bursaType").querySelector(`option[value="${CSS.escape(s.bursaType)}"]`)) $("bursaType").value = s.bursaType;
@@ -51,7 +52,7 @@ function save(){
   try{
     localStorage.setItem(STORE_KEY, JSON.stringify({
       market: state.market, calc: state.calc, rates: state.rates,
-      fx: $("fx").value, bursaType: $("bursaType").value, usType: $("usType").value,
+      fx: $("fx").value, targetPct: $("targetPct").value, bursaType: $("bursaType").value, usType: $("usType").value,
       promo: $("promo").checked, usSst: $("usSst").checked,
       fxMode: fx.mode, fxLive: fx.live
     }));
@@ -123,6 +124,7 @@ function readNum(id){
 const fees = (value, shares, side, opt) => FE.fees(state.market, value, shares, side, opt, state.rates);
 const roundUpTick = p => FE.roundUpTick(state.market, p);
 const breakEven = (cashOut, shares, opt) => FE.breakEven(state.market, cashOut, shares, opt, state.rates);
+const targetSellPrice = (cashOut, shares, opt, pct) => FE.targetSellPrice(state.market, cashOut, shares, opt, state.rates, pct);
 
 /* ---------- Formatting ---------- */
 const cur = () => state.market === "us" ? "$" : "RM";
@@ -181,7 +183,7 @@ function options(){
 }
 
 function calcTrade(opt){
-  const bp = readNum("buyPrice"), q = readNum("qty"), sp = readNum("sellPrice");
+  const bp = readNum("buyPrice"), q = readNum("qty"), sp = readNum("sellPrice"), tp = readNum("targetPct");
   const shares = q.v;
   const buyValue = round2(bp.v * shares);
   const hasBuy = buyValue > 0;
@@ -229,6 +231,7 @@ function calcTrade(opt){
   }else{
     $("vBe").textContent = "—"; $("sBe").textContent = "Covers buy + sell fees";
   }
+  renderTarget(hasBuy, cashOut, shares, bp.v, tp.v, opt);
 
   // Hints / warnings
   $("qtyHint").textContent = state.market === "bursa"
@@ -238,8 +241,23 @@ function calcTrade(opt){
   if(state.market === "bursa" && shares > 0 && shares % 100 !== 0) notes.push("Bursa normal board trades in lots of 100; odd lots go to the odd-lot market.");
   if(state.market === "us" && !(opt.fx > 0)) notes.push("Enter a valid USD/MYR rate — Malaysian stamp duty on US trades cannot be computed without it.");
   if(state.market === "us" && shares > 0 && shares < 1) notes.push("Order < 1 share: no commission; platform fee is % based (max $0.99); settlement, SEC and TAF are not charged.");
-  if(![bp, q, sp].every(x => x.ok)) notes.push("Some inputs are invalid — use positive numbers only.");
-  showNote("tradeNote", notes, state.market === "us" && !(opt.fx > 0) || ![bp, q, sp].every(x => x.ok));
+  if(![bp, q, sp, tp].every(x => x.ok)) notes.push("Some inputs are invalid — use positive numbers only.");
+  showNote("tradeNote", notes, state.market === "us" && !(opt.fx > 0) || ![bp, q, sp, tp].every(x => x.ok));
+}
+
+/** Target sell price tile: exact solve, then the tradable (tick-rounded) price and the net result at that price. */
+function renderTarget(hasBuy, cashOut, shares, buyPrice, pct, opt){
+  const tile = $("tTarget");
+  tile.hidden = !(hasBuy && pct > 0);
+  if(tile.hidden) return;
+  $("kTarget").textContent = `Target sell price · +${fmt(pct, 0, 2)}% net`;
+  const exact = targetSellPrice(cashOut, shares, opt, pct);
+  if(!exact){ $("vTarget").textContent = "—"; $("sTarget").textContent = "Not reachable"; return; }
+  const tick = roundUpTick(exact);
+  const value = round2(tick * shares);
+  const pnl = round2(value - fees(value, shares, "sell", opt).total - cashOut);
+  $("vTarget").textContent = price(tick);
+  $("sTarget").textContent = `Net ${signed(pnl)} (${pnl >= 0 ? "+" : ""}${fmt(pnl / cashOut * 100, 2)}%) at this price · +${fmt((tick / buyPrice - 1) * 100, 2)}% from buy · exact ${price(exact)}`;
 }
 
 function calcAvg(opt){
@@ -370,7 +388,7 @@ document.querySelectorAll("[data-market]").forEach(b => b.addEventListener("clic
 document.querySelectorAll("[data-calc]").forEach(b => b.addEventListener("click", () => {
   state.calc = b.dataset.calc; applyMode(); update(false);
 }));
-["buyPrice","qty","sellPrice","curAvg","curQty","addPrice","addQty"].forEach(id => $(id).addEventListener("input", () => update(false)));
+["buyPrice","qty","sellPrice","targetPct","curAvg","curQty","addPrice","addQty"].forEach(id => $(id).addEventListener("input", () => update(false)));
 $("fx").addEventListener("input", () => { fx.mode = "manual"; showFxState(); update(false); });
 $("fxRefresh").addEventListener("click", () => { fx.mode = "live"; fetchFx(true); });
 ["bursaType","usType","promo","usSst"].forEach(id => $(id).addEventListener("change", () => update()));
