@@ -7,8 +7,8 @@
 <meta name="referrer" content="no-referrer">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#0f2b4c">
-<title>Moomoo Fee Calculator</title>
-<meta name="description" content="Moomoo Malaysia fee calculator for Bursa and US stocks">
+<title>Bursa &amp; US Fee Calculator</title>
+<meta name="description" content="Independent fee and P/L calculator for Bursa Malaysia and US stocks, based on the Moomoo Malaysia fee schedule. Not affiliated with Moomoo or Futu.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -20,8 +20,8 @@
 <body>
 <div class="wrap">
 <header>
-  <h1>Moomoo Fee Calculator</h1>
-  <span class="asof">Moomoo MY schedule · Sep 2026</span>
+  <h1>Bursa &amp; US Fee Calculator</h1>
+  <span class="asof">Moomoo MY fee schedule · rates as of Sep 2026</span>
 </header>
 
 <div class="seg" role="tablist" aria-label="Market">
@@ -73,7 +73,8 @@
   <div class="grid">
     <div><label for="buyPrice" class="cur">Buy price</label><input id="buyPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
     <div><label for="qty">Quantity (shares)</label><input id="qty" inputmode="decimal" autocomplete="off" placeholder="0"><div class="hint" id="qtyHint"></div></div>
-    <div class="full"><label for="sellPrice" class="cur">Sell price (optional)</label><input id="sellPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+    <div><label for="sellPrice" class="cur">Sell price (optional)</label><input id="sellPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+    <div><label for="targetPct">Target profit % <span class="lbl-note">(optional)</span></label><input id="targetPct" inputmode="decimal" autocomplete="off" placeholder="e.g. 10"></div>
   </div>
 
   <h2>Result</h2>
@@ -82,6 +83,7 @@
     <div class="tile"><div class="k">Total cash out</div><div class="v" id="vCash">—</div><div class="s">Buy value + buy fees</div></div>
     <div class="tile"><div class="k">Net received</div><div class="v" id="vNet">—</div><div class="s">Sell value − sell fees</div></div>
     <div class="tile hl full"><div class="k">Break-even sell price</div><div class="v" id="vBe">—</div><div class="s" id="sBe">Covers buy + sell fees</div></div>
+    <div class="tile pos full" id="tTarget" hidden><div class="k" id="kTarget">Target sell price</div><div class="v" id="vTarget">—</div><div class="s" id="sTarget"></div></div>
   </div>
 
   <h2>Fee breakdown</h2>
@@ -128,8 +130,10 @@
 </section>
 
 <footer>
-  Estimates only, based on Moomoo Securities Malaysia's published fee schedule. Regulatory rates (SEC, TAF, CAT) and FX change;
-  verify against your contract note. Your inputs never leave this device; the only network request fetches the USD/MYR rate.
+  <p><strong>Independent tool.</strong> Not affiliated with, endorsed by or connected to Moomoo, Futu or any broker.
+  Fees follow Moomoo Securities Malaysia's published schedule as of Sep 2026, checked against real contract notes; brokers and regulators change fees, so always check your contract note.</p>
+  <p><strong>Not financial advice.</strong> Results are estimates for information only and are not a recommendation to buy or sell any security.</p>
+  <p>Your inputs never leave this device; the only network request fetches the USD/MYR rate.</p>
 </footer>
 </div>
 

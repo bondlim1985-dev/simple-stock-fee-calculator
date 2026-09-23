@@ -1,6 +1,6 @@
 :root{
   --bg:#f2f5f9;--card:#fff;--ink:#14213a;--muted:#66728a;--faint:#8e98ab;--line:#e1e7ef;--field:#fff;--field-line:#cdd6e2;
-  --brand:#0f2b4c;--brand-ink:#fff;--accent:#ff6a00;--soft:#f6f8fb;
+  --brand:#0f2b4c;--brand-ink:#fff;--accent:#1f9d74;--soft:#f6f8fb;
   --pos:#12804a;--pos-bg:#e8f7ee;--neg:#c42b3f;--neg-bg:#fdecee;--hl:#a02b62;--hl-bg:#fdf0f6;
   --radius:12px;
 }
@@ -75,6 +75,7 @@ details[open] summary::after{content:"－"}
 .fx-btn:disabled{opacity:.6;cursor:progress}
 #fxStatus.ok{color:var(--pos)}
 #fxStatus.err{color:var(--neg)}
+footer p{margin:0 0 6px}
 footer{font-size:10.5px;color:var(--faint);margin:12px 4px 0;line-height:1.5}
 [hidden]{display:none!important}
 @media (max-width:360px){.wrap{padding:10px 8px}.card{padding:10px}.grid,.opts{gap:6px}.tile .v{font-size:14px}.tile.main .v{font-size:18px}}

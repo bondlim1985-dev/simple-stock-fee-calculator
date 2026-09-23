@@ -180,3 +180,34 @@ test("break-even covers buy cash-out after sell fees", () => {
   }
   assert.equal(FE.breakEven("bursa", 0, 100, {}, R), 0);
 });
+
+test("target sell price: lowest price reaching the net profit target", () => {
+  const cases = [
+    ["bursa", 10.62, 1000, 10],   // Maybank-sized Bursa trade, +10%
+    ["bursa", 0.5, 2000, 25],     // penny stock, sub-RM1 ticks
+    ["us", 585.04, 1, 5],         // 1-share US trade
+    ["us", 600, 0.3, 20]          // fractional US trade
+  ];
+  for (const [market, price, shares, pct] of cases) {
+    const opt = { type: "ordinary", usType: "nms", fx: 4.0 };
+    const value = FE.round2(price * shares);
+    const cashOut = value + FE.fees(market, value, shares, "buy", opt, R).total;
+    const goal = cashOut * (1 + pct / 100);
+    const net = p => p * shares - FE.fees(market, p * shares, shares, "sell", opt, R).total;
+    const tp = FE.targetSellPrice(market, cashOut, shares, opt, R, pct);
+    const label = `${market} ${price}x${shares} +${pct}%`;
+    assert.ok(net(tp) >= goal - 1e-9, `${label}: reaches target`);
+    assert.ok(net(tp - 0.001) < goal, `${label}: is the lowest such price`);
+    const tick = FE.roundUpTick(market, tp);
+    assert.ok(tick >= tp && net(tick) >= goal - 1e-9, `${label}: tradable price still meets target`);
+  }
+});
+
+test("target sell price: 0% equals break-even; invalid input returns 0", () => {
+  const opt = { type: "ordinary" };
+  const cashOut = 10620 + FE.bursaFees(10620, opt, R.bursa).total;
+  assert.equal(FE.targetSellPrice("bursa", cashOut, 1000, opt, R, 0), FE.breakEven("bursa", cashOut, 1000, opt, R));
+  assert.equal(FE.targetSellPrice("bursa", 0, 1000, opt, R, 10), 0);
+  assert.equal(FE.targetSellPrice("bursa", cashOut, 0, opt, R, 10), 0);
+  assert.equal(FE.targetSellPrice("bursa", cashOut, 1000, opt, R, -100), 0);
+});

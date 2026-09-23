@@ -132,20 +132,29 @@ function roundUpTick(market, p) {
   return Number(q.toFixed(4));
 }
 
+/**
+ * Lowest sell price whose net proceeds (after sell fees) reach cashOut * (1 + targetPct / 100).
+ * Profit % is measured on total cash out (buy value + buy fees), same as the P/L return. 0 if unreachable.
+ */
+function targetSellPrice(market, cashOut, shares, opt, rates, targetPct) {
+  if (!(cashOut > 0) || !(shares > 0) || !(targetPct > -100)) return 0;
+  const goal = cashOut * (1 + targetPct / 100);
+  const net = p => { const v = p * shares; return v - fees(market, v, shares, "sell", opt, rates).total; };
+  let lo = 0, hi = Math.max(0.01, goal / shares * 1.5), guard = 0;
+  while (net(hi) < goal && guard++ < 60) hi *= 2;
+  if (net(hi) < goal) return 0;
+  for (let i = 0; i < 80; i++) { const mid = (lo + hi) / 2; if (net(mid) >= goal) hi = mid; else lo = mid; }
+  return hi;
+}
+
 /** Lowest sell price whose net proceeds cover cashOut. 0 if unreachable. */
 function breakEven(market, cashOut, shares, opt, rates) {
-  if (!(cashOut > 0) || !(shares > 0)) return 0;
-  const net = p => { const v = p * shares; return v - fees(market, v, shares, "sell", opt, rates).total; };
-  let lo = 0, hi = Math.max(0.01, cashOut / shares * 1.5), guard = 0;
-  while (net(hi) < cashOut && guard++ < 60) hi *= 2;
-  if (net(hi) < cashOut) return 0;
-  for (let i = 0; i < 80; i++) { const mid = (lo + hi) / 2; if (net(mid) >= cashOut) hi = mid; else lo = mid; }
-  return hi;
+  return targetSellPrice(market, cashOut, shares, opt, rates, 0);
 }
 
 const api = Object.freeze({
   RATES_AS_OF, DEFAULTS, RATE_NOTES, SST_BURSA,
-  round2, ceil2, bursaFees, usFees, fees, tickFor, roundUpTick, breakEven
+  round2, ceil2, bursaFees, usFees, fees, tickFor, roundUpTick, breakEven, targetSellPrice
 });
 
 if (typeof module === "object" && module.exports) module.exports = api;
