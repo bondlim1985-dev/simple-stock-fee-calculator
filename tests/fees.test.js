@@ -78,6 +78,21 @@ test("bursa: zero or invalid value costs nothing", () => {
   for (const v of [0, -5, NaN]) assert.equal(bursa(v).total, 0);
 });
 
+test("us: matches real Moomoo buy — VOO 1 @ 585.04 (30 Mar 2026, USD/MYR ~4.0)", () => {
+  assert.deepEqual(us(585.04, 1, "buy", { fx: 4.0 }), {
+    lines: { commission: 0.18, platform: 0.99, settlement: 0, sec: 0, taf: 0, cat: 0, stamp: 0.75, sst: 0 },
+    total: 1.92, frac: false
+  });
+});
+
+test("us: matches real Moomoo fractional sell — VOO 0.3 @ 709.12 (4 Aug 2026, USD/MYR ~4.0)", () => {
+  // No commission, platform capped at 0.99, no settlement/SEC/TAF, stamp RM1 -> $0.25
+  assert.deepEqual(us(212.74, 0.3, "sell", { fx: 4.0 }), {
+    lines: { commission: 0, platform: 0.99, settlement: 0, sec: 0, taf: 0, cat: 0, stamp: 0.25, sst: 0 },
+    total: 1.24, frac: true
+  });
+});
+
 test("us: USD1,000 buy (10 shares) at 4.20", () => {
   assert.deepEqual(us(1000, 10, "buy"), {
     lines: { commission: 0.3, platform: 0.99, settlement: 0.03, sec: 0, taf: 0, cat: 0, stamp: 1.19, sst: 0 },
@@ -103,6 +118,7 @@ test("us: settlement capped at 1% of value", () => {
 test("us: fractional order (< 1 share)", () => {
   const f = us(5, 0.05, "sell");
   assert.equal(f.frac, true);
+  assert.equal(f.lines.commission, 0);
   assert.equal(f.lines.platform, 0.05);             // 0.99% of 5
   assert.equal(f.lines.settlement, 0);
   assert.equal(f.lines.sec, 0);

@@ -146,7 +146,7 @@ function rowDefs(){
     ];
   }
   const rows = [
-    ["commission","Commission", `${r.commPct}% of value${$("promo").checked ? " · promo 0%" : ""}`],
+    ["commission","Commission", `${r.commPct}% of value · none if <1 share${$("promo").checked ? " · promo 0%" : ""}`],
     ["platform","Platform fee", `$${r.platform}/order · <1 share: ${r.fracPlatPct}%, max $${r.fracPlatCap}`],
     ["settlement","Settlement fee", `$${r.settle}/share, max ${r.settleCapPct}% of value`],
     ["sec","SEC fee", `Sell only · $${r.secPerM}/$1m, min $${r.secMin}`],
@@ -237,7 +237,7 @@ function calcTrade(opt){
   const notes = [];
   if(state.market === "bursa" && shares > 0 && shares % 100 !== 0) notes.push("Bursa normal board trades in lots of 100; odd lots go to the odd-lot market.");
   if(state.market === "us" && !(opt.fx > 0)) notes.push("Enter a valid USD/MYR rate — Malaysian stamp duty on US trades cannot be computed without it.");
-  if(state.market === "us" && shares > 0 && shares < 1) notes.push("Order < 1 share: platform fee is % based; settlement, SEC and TAF are not charged.");
+  if(state.market === "us" && shares > 0 && shares < 1) notes.push("Order < 1 share: no commission; platform fee is % based (max $0.99); settlement, SEC and TAF are not charged.");
   if(![bp, q, sp].every(x => x.ok)) notes.push("Some inputs are invalid — use positive numbers only.");
   showNote("tradeNote", notes, state.market === "us" && !(opt.fx > 0) || ![bp, q, sp].every(x => x.ok));
 }
@@ -306,7 +306,7 @@ function renderRules(){
     `Fees are identical on buy and sell.`
   ] : [
     `Commission ${r.commPct}% of value. Platform fee $${r.platform} per order.`,
-    `Orders under 1 share: platform fee ${r.fracPlatPct}% of value, max $${r.fracPlatCap}; no settlement, SEC or TAF.`,
+    `Orders under 1 share: no commission; platform fee ${r.fracPlatPct}% of value, max $${r.fracPlatCap}; no settlement, SEC or TAF.`,
     `Settlement $${r.settle}/share, capped at ${r.settleCapPct}% of value (buy and sell).`,
     `SEC fee (sell only) $${r.secPerM} per $1m sold, min $${r.secMin} — resumed 4 Apr 2026.`,
     `FINRA TAF (sell only) $${r.taf}/share, min $${r.tafMin}, max $${r.tafMax}.`,
