@@ -29,24 +29,36 @@ const state = { market: "bursa", calc: "trade", rates: clone(DEFAULTS) };
 
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 function load(){
-  try{
-    const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
-    if(!s) return;
-    if(s.market === "bursa" || s.market === "us") state.market = s.market;
-    if(s.calc === "trade" || s.calc === "avg" || s.calc === "budget") state.calc = s.calc;
-    for(const m of ["bursa","us"]) for(const k in DEFAULTS[m]){
-      const v = s.rates && s.rates[m] && s.rates[m][k];
+  let s = null;
+  try{ s = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); }
+  catch{ return; }   // storage unavailable or corrupt: keep defaults
+  if(!s || typeof s !== "object") return;
+  if(["bursa","us"].includes(s.market)) state.market = s.market;
+  if(["trade","avg","budget"].includes(s.calc)) state.calc = s.calc;
+  loadRates(s.rates);
+  loadInputs(s);
+  loadFx(s);
+}
+function loadRates(saved){
+  for(const m of ["bursa","us"]){
+    for(const k in DEFAULTS[m]){
+      const v = saved?.[m]?.[k];
       if(typeof v === "number" && Number.isFinite(v) && v >= 0) state.rates[m][k] = v;
     }
-    if(typeof s.fx === "string") $("fx").value = s.fx;
-    if(typeof s.targetPct === "string" && /^\d{0,4}(\.\d{0,2})?$/.test(s.targetPct)) $("targetPct").value = s.targetPct;
-    if(s.fxMode === "manual" || s.fxMode === "live") fx.mode = s.fxMode;
-    if(s.fxLive && validFx(s.fxLive.rate) && typeof s.fxLive.date === "string" && typeof s.fxLive.at === "number") fx.live = s.fxLive;
-    if(typeof s.bursaType === "string" && $("bursaType").querySelector(`option[value="${CSS.escape(s.bursaType)}"]`)) $("bursaType").value = s.bursaType;
-    if(s.usType === "nms" || s.usType === "otc") $("usType").value = s.usType;
-    $("promo").checked = !!s.promo;
-    $("usSst").checked = !!s.usSst;
-  }catch(_){ /* storage unavailable or corrupt: use defaults */ }
+  }
+}
+function loadInputs(s){
+  if(typeof s.fx === "string") $("fx").value = s.fx;
+  if(typeof s.targetPct === "string" && /^\d{0,4}(?:\.\d{0,2})?$/.test(s.targetPct)) $("targetPct").value = s.targetPct;
+  if(typeof s.bursaType === "string" && $("bursaType").querySelector(`option[value="${CSS.escape(s.bursaType)}"]`)) $("bursaType").value = s.bursaType;
+  if(["nms","otc"].includes(s.usType)) $("usType").value = s.usType;
+  $("promo").checked = !!s.promo;
+  $("usSst").checked = !!s.usSst;
+}
+function loadFx(s){
+  if(["manual","live"].includes(s.fxMode)) fx.mode = s.fxMode;
+  const l = s.fxLive;
+  if(l && validFx(l.rate) && typeof l.date === "string" && typeof l.at === "number") fx.live = l;
 }
 function save(){
   try{
@@ -56,7 +68,9 @@ function save(){
       promo: $("promo").checked, usSst: $("usSst").checked,
       fxMode: fx.mode, fxLive: fx.live
     }));
-  }catch(_){}
+  }catch{
+    // Storage full, disabled or in private mode: settings just won't persist; the calculator still works.
+  }
 }
 
 /* ---------- Live FX (ECB reference rate via Frankfurter) ---------- */
@@ -97,7 +111,8 @@ async function fetchFx(force){
     $("fx").value = rate.toFixed(4);
     $("fx").classList.remove("bad");
     fx.busy = false; showFxState();
-  }catch(_){
+  }catch{
+    // Network error, timeout or unexpected payload: fall back to the last live rate or the rate already shown.
     fx.busy = false;
     if(fx.live) $("fx").value = fx.live.rate.toFixed(4);
     fxStatus(fx.live ? `Offline — using last live rate (${fxDateLabel(fx.live.date)})` : "Couldn't fetch live rate — using the rate shown", "err");
@@ -113,7 +128,7 @@ function readNum(id){
   const el = $(id);
   const raw = el.value.replace(/[,\s]/g, "");
   if(raw === ""){ el.classList.remove("bad"); return { v: 0, ok: true, empty: true }; }
-  const ok = /^\d*\.?\d+$|^\d+\.$/.test(raw);
+  const ok = /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw);   // 12, 12., 12.5, .5 — linear-time, no backtracking
   const v = ok ? Number(raw) : NaN;
   const good = ok && Number.isFinite(v);
   el.classList.toggle("bad", !good);
@@ -135,6 +150,15 @@ function money(n){ const s = n < 0 ? "−" : ""; return s + cur() + fmt(Math.abs
 function signed(n){ return (n > 0 ? "+" : "") + money(n); }
 function price(n){ return cur() + fmt(n, state.market === "us" && n >= 1 ? 2 : 3, 4); }
 function qtyFmt(n){ return fmt(n, 0, 4); }
+function plural(n, word){ return `${qtyFmt(n)} ${word}${n === 1 ? "" : "s"}`; }
+function signPct(n){ return `${n >= 0 ? "+" : ""}${fmt(n, 2)}%`; }
+function pnlClass(n){
+  if(n > 0) return "pos";
+  if(n < 0) return "neg";
+  return "hl";
+}
+const isPos = FE.isPos;
+const hasFx = opt => state.market !== "us" || isPos(opt.fx);
 
 /* ---------- Row definitions ---------- */
 function rowDefs(){
@@ -162,7 +186,12 @@ function rowDefs(){
   return rows;
 }
 
-function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
+function el(tag, cls, text){
+  const e = document.createElement(tag);
+  if(cls) e.className = cls;
+  if(text != null) e.textContent = text;
+  return e;
+}
 function labelCell(label, note){
   const td = el("td"); td.append(label);
   if(note){ const s = el("small", null, note); td.append(s); }
@@ -170,6 +199,17 @@ function labelCell(label, note){
 }
 function valCell(v, active){
   return active ? el("td", null, money(v)) : el("td", "na", "—");
+}
+
+/** Buy-only fee table: trade value, each applicable fee (no SEC/TAF on buys), total. */
+function renderBuyFeeTable(bodyId, value, f, has){
+  const body = $(bodyId);
+  const rows = [[labelCell("Trade value"), valCell(value, has)]];
+  for(const [key, label, note] of rowDefs()){
+    if(key !== "sec" && key !== "taf") rows.push([labelCell(label, note), valCell(f.lines[key] || 0, has)]);
+  }
+  body.replaceChildren(...rows.map(cells => { const tr = el("tr"); tr.append(...cells); return tr; }));
+  const trT = el("tr", "sum"); trT.append(labelCell("Total fees"), valCell(f.total, has)); body.append(trT);
 }
 
 /* ---------- Calculators ---------- */
@@ -191,61 +231,72 @@ function calcTrade(opt){
   const hasBuy = buyValue > 0;
   const hasSell = sp.v > 0 && shares > 0;
   const sellValue = hasSell ? round2(sp.v * shares) : 0;
-
   const bf = fees(buyValue, shares, "buy", opt);
   const sf = hasSell ? fees(sellValue, shares, "sell", opt) : { lines: {}, total: 0 };
-  const cashOut = round2(buyValue + bf.total);
-  const netIn = round2(sellValue - sf.total);
+  const t = { shares, buyValue, sellValue, hasBuy, hasSell, bf, sf,
+              cashOut: round2(buyValue + bf.total), netIn: round2(sellValue - sf.total) };
 
-  // Table
-  const body = $("tradeRows"); body.replaceChildren();
-  const trV = el("tr"); trV.append(labelCell("Trade value"), valCell(buyValue, hasBuy), valCell(sellValue, hasSell)); body.append(trV);
+  renderTradeTable(t);
+  renderPnl(t);
+  renderBreakEven(t, bp.v, opt);
+  renderTarget(hasBuy, t.cashOut, shares, bp.v, tp.v, opt);
+  renderDrag("", bp.v, shares, opt);
+  renderTradeHints(shares, opt, [bp, q, sp, tp].every(x => x.ok));
+}
+
+function renderTradeTable(t){
+  const body = $("tradeRows");
+  const rows = [["", "Trade value", null, valCell(t.buyValue, t.hasBuy), valCell(t.sellValue, t.hasSell)]];
   for(const [key, label, note] of rowDefs()){
-    const tr = el("tr");
-    const buyApplies = !(key === "sec" || key === "taf");
-    tr.append(labelCell(label, note),
-      buyApplies ? valCell(bf.lines[key] || 0, hasBuy) : el("td", "na", "—"),
-      valCell(sf.lines[key] || 0, hasSell));
-    body.append(tr);
+    const buyCell = key === "sec" || key === "taf" ? el("td", "na", "—") : valCell(t.bf.lines[key] || 0, t.hasBuy);
+    rows.push(["", label, note, buyCell, valCell(t.sf.lines[key] || 0, t.hasSell)]);
   }
-  const trT = el("tr", "sum"); trT.append(labelCell("Total fees"), valCell(bf.total, hasBuy), valCell(sf.total, hasSell)); body.append(trT);
-  const trG = el("tr", "grand"); trG.append(labelCell("Cash out / Net in"), valCell(cashOut, hasBuy), valCell(netIn, hasSell)); body.append(trG);
+  rows.push(["sum", "Total fees", null, valCell(t.bf.total, t.hasBuy), valCell(t.sf.total, t.hasSell)]);
+  rows.push(["grand", "Cash out / Net in", null, valCell(t.cashOut, t.hasBuy), valCell(t.netIn, t.hasSell)]);
+  body.replaceChildren(...rows.map(([cls, label, note, a, b]) => {
+    const tr = el("tr", cls || null); tr.append(labelCell(label, note), a, b); return tr;
+  }));
+}
 
-  // Tiles
-  $("vCash").textContent = hasBuy ? money(cashOut) : "—";
-  $("vNet").textContent  = hasSell ? money(netIn) : "—";
+function renderPnl(t){
+  $("vCash").textContent = t.hasBuy ? money(t.cashOut) : "—";
+  $("vNet").textContent  = t.hasSell ? money(t.netIn) : "—";
   const tile = $("tPnl");
   tile.className = "tile main";
-  if(hasBuy && hasSell){
-    const pnl = round2(netIn - cashOut);
-    const gross = round2(sellValue - buyValue);
-    $("vPnl").textContent = signed(pnl);
-    $("tRet").textContent = `${pnl >= 0 ? "+" : ""}${fmt(pnl / cashOut * 100, 2)}% · gross ${signed(gross)} · fees ${money(bf.total + sf.total)}`;
-    tile.classList.add(pnl > 0 ? "pos" : pnl < 0 ? "neg" : "hl");
-  }else{
+  if(!(t.hasBuy && t.hasSell)){
     $("vPnl").textContent = "—";
-    $("tRet").textContent = hasBuy ? "Enter a sell price" : "Enter buy price and quantity";
+    $("tRet").textContent = t.hasBuy ? "Enter a sell price" : "Enter buy price and quantity";
+    return;
   }
-  if(hasBuy){
-    const be = breakEven(cashOut, shares, opt);
-    $("vBe").textContent = be ? price(be) : "—";
-    $("sBe").textContent = be ? `Min. tradable: ${price(roundUpTick(be))} · +${fmt((be / bp.v - 1) * 100, 2)}% from buy` : "Covers buy + sell fees";
-  }else{
-    $("vBe").textContent = "—"; $("sBe").textContent = "Covers buy + sell fees";
-  }
-  renderTarget(hasBuy, cashOut, shares, bp.v, tp.v, opt);
-  renderDrag("", bp.v, shares, opt);
+  const pnl = round2(t.netIn - t.cashOut);
+  const gross = round2(t.sellValue - t.buyValue);
+  $("vPnl").textContent = signed(pnl);
+  $("tRet").textContent = `${signPct(pnl / t.cashOut * 100)} · gross ${signed(gross)} · fees ${money(t.bf.total + t.sf.total)}`;
+  tile.classList.add(pnlClass(pnl));
+}
 
-  // Hints / warnings
-  $("qtyHint").textContent = state.market === "bursa"
-    ? (shares > 0 ? `${qtyFmt(shares / 100)} lot${shares === 100 ? "" : "s"} · 1 lot = 100` : "1 lot = 100 shares")
-    : (shares > 0 && shares < 1 ? "Fractional order (< 1 share)" : "Fractional allowed");
+function renderBreakEven(t, buyPrice, opt){
+  const be = t.hasBuy ? breakEven(t.cashOut, t.shares, opt) : 0;
+  $("vBe").textContent = be ? price(be) : "—";
+  $("sBe").textContent = be
+    ? `Min. tradable: ${price(roundUpTick(be))} · +${fmt((be / buyPrice - 1) * 100, 2)}% from buy`
+    : "Covers buy + sell fees";
+}
+
+function qtyHint(shares){
+  if(state.market === "bursa") return shares > 0 ? `${plural(shares / 100, "lot")} · 1 lot = 100` : "1 lot = 100 shares";
+  return shares > 0 && shares < 1 ? "Fractional order (< 1 share)" : "Fractional allowed";
+}
+
+function renderTradeHints(shares, opt, inputsOk){
+  $("qtyHint").textContent = qtyHint(shares);
+  const us = state.market === "us";
   const notes = [];
-  if(state.market === "bursa" && shares > 0 && shares % 100 !== 0) notes.push("Bursa normal board trades in lots of 100; odd lots go to the odd-lot market.");
-  if(state.market === "us" && !(opt.fx > 0)) notes.push("Enter a valid USD/MYR rate — Malaysian stamp duty on US trades cannot be computed without it.");
-  if(state.market === "us" && shares > 0 && shares < 1) notes.push("Order < 1 share: no commission; platform fee is % based (max $0.99); settlement, SEC and TAF are not charged.");
-  if(![bp, q, sp, tp].every(x => x.ok)) notes.push("Some inputs are invalid — use positive numbers only.");
-  showNote("tradeNote", notes, state.market === "us" && !(opt.fx > 0) || ![bp, q, sp, tp].every(x => x.ok));
+  if(!us && shares > 0 && shares % 100 !== 0) notes.push("Bursa normal board trades in lots of 100; odd lots go to the odd-lot market.");
+  if(!hasFx(opt)) notes.push("Enter a valid USD/MYR rate — Malaysian stamp duty on US trades cannot be computed without it.");
+  if(us && shares > 0 && shares < 1) notes.push("Order < 1 share: no commission; platform fee is % based (max $0.99); settlement, SEC and TAF are not charged.");
+  if(!inputsOk) notes.push("Some inputs are invalid — use positive numbers only.");
+  showNote("tradeNote", notes, !hasFx(opt) || !inputsOk);
 }
 
 /** Target sell price tile: exact solve, then the tradable (tick-rounded) price and the net result at that price. */
@@ -260,7 +311,7 @@ function renderTarget(hasBuy, cashOut, shares, buyPrice, pct, opt){
   const value = round2(tick * shares);
   const pnl = round2(value - fees(value, shares, "sell", opt).total - cashOut);
   $("vTarget").textContent = price(tick);
-  $("sTarget").textContent = `Net ${signed(pnl)} (${pnl >= 0 ? "+" : ""}${fmt(pnl / cashOut * 100, 2)}%) at this price · +${fmt((tick / buyPrice - 1) * 100, 2)}% from buy · exact ${price(exact)}`;
+  $("sTarget").textContent = `Net ${signed(pnl)} (${signPct(pnl / cashOut * 100)}) at this price · +${fmt((tick / buyPrice - 1) * 100, 2)}% from buy · exact ${price(exact)}`;
 }
 
 function calcAvg(opt){
@@ -276,36 +327,33 @@ function calcAvg(opt){
   $("vAddCash").textContent = addValue > 0 ? money(addCash) : "—";
   $("vTotQty").textContent = qtyFmt(totQty);
   $("vTotCost").textContent = totCost > 0 ? money(totCost) : "—";
-  if(totQty > 0 && totCost > 0){
-    const avg = totCost / totQty;
-    $("vAvg").textContent = price(avg);
-    // Green when the new average sits below the new buy price (≈ market): the whole position is in profit at that price.
-    const inProfit = np.v > 0 && avg < np.v;
-    $("tAvg").className = "tile main " + (inProfit ? "pos" : "hl");
-    const parts = [];
-    if(ca.v > 0) parts.push(`${avg <= ca.v ? "▼" : "▲"} ${fmt(Math.abs(avg / ca.v - 1) * 100, 2)}% vs current avg`);
-    if(np.v > 0) { const g = (np.v / avg - 1) * 100; parts.push(`position ${g >= 0 ? "+" : "−"}${fmt(Math.abs(g), 2)}% at new buy price`); }
-    parts.push("incl. new buy fees");
-    $("sAvg").textContent = parts.join(" · ");
-  }else{
-    $("tAvg").className = "tile main hl";
-    $("vAvg").textContent = "—"; $("sAvg").textContent = "Incl. new buy fees";
-  }
-
-  const body = $("avgRows"); body.replaceChildren();
-  const has = addValue > 0;
-  const trV = el("tr"); trV.append(labelCell("Trade value"), valCell(addValue, has)); body.append(trV);
-  for(const [key, label, note] of rowDefs()){
-    if(key === "sec" || key === "taf") continue;
-    const tr = el("tr"); tr.append(labelCell(label, note), valCell(f.lines[key] || 0, has)); body.append(tr);
-  }
-  const trT = el("tr", "sum"); trT.append(labelCell("Total fees"), valCell(f.total, has)); body.append(trT);
+  renderNewAverage(totQty > 0 && totCost > 0 ? totCost / totQty : 0, ca.v, np.v);
+  renderBuyFeeTable("avgRows", addValue, f, addValue > 0);
 
   const notes = ["Enter your current average as shown in Moomoo (it already includes past buy fees if you use \"average cost\")."];
   const bad = ![ca, cq, np, aq].every(x => x.ok);
   if(bad) notes.unshift("Some inputs are invalid — use positive numbers only.");
-  if(state.market === "us" && !(opt.fx > 0)) notes.unshift("Enter a valid USD/MYR rate for stamp duty.");
-  showNote("avgNote", notes, bad || (state.market === "us" && !(opt.fx > 0)));
+  if(!hasFx(opt)) notes.unshift("Enter a valid USD/MYR rate for stamp duty.");
+  showNote("avgNote", notes, bad || !hasFx(opt));
+}
+
+/** New average tile. Green when the average sits below the new buy price (≈ market): the position is in profit there. */
+function renderNewAverage(avg, curAvg, newPrice){
+  if(!avg){
+    $("tAvg").className = "tile main hl";
+    $("vAvg").textContent = "—"; $("sAvg").textContent = "Incl. new buy fees";
+    return;
+  }
+  $("vAvg").textContent = price(avg);
+  $("tAvg").className = "tile main " + (newPrice > 0 && avg < newPrice ? "pos" : "hl");
+  const parts = [];
+  if(curAvg > 0) parts.push(`${avg <= curAvg ? "▼" : "▲"} ${fmt(Math.abs(avg / curAvg - 1) * 100, 2)}% vs current avg`);
+  if(newPrice > 0){
+    const g = (newPrice / avg - 1) * 100;
+    parts.push(`position ${g >= 0 ? "+" : "−"}${fmt(Math.abs(g), 2)}% at new buy price`);
+  }
+  parts.push("incl. new buy fees");
+  $("sAvg").textContent = parts.join(" · ");
 }
 
 /**
@@ -315,72 +363,94 @@ function calcAvg(opt){
 function renderDrag(prefix, price, shares, opt){
   const tile = $("t" + prefix + "Drag");
   const rt = FE.roundTripFees(state.market, price, shares, opt, state.rates);
-  tile.hidden = !(rt.value > 0);
+  tile.hidden = !isPos(rt.value);
   if(tile.hidden) return;
-  const level = rt.pct <= DRAG_LOW ? "Low" : rt.pct <= DRAG_HIGH ? "Moderate" : "High";
-  tile.className = "tile full " + (level === "Low" ? "pos" : level === "Moderate" ? "warn" : "neg");
+  const [level, cls] = dragLevel(rt.pct);
+  tile.className = "tile full " + cls;
   $("k" + prefix + "Drag").textContent = `Fee drag · ${level}`;
   $("v" + prefix + "Drag").textContent = `${fmt(rt.pct, 2)}% · ${money(rt.total)}`;
   const parts = [`Buy + sell fees on ${money(rt.value)}; price must rise ${fmt(rt.pct, 2)}% just to cover them`];
-  if(rt.pct > DRAG_HIGH){
-    const bursa = state.market === "bursa";
-    const minQ = FE.minOrderForDrag(state.market, price, opt, state.rates, bursa ? 100 : 1, DRAG_HIGH);
-    if(minQ > shares){
-      const size = bursa ? `${qtyFmt(minQ / 100)} lot${minQ === 100 ? "" : "s"}` : `${qtyFmt(minQ)} share${minQ === 1 ? "" : "s"}`;
-      parts.push(`buy at least ${size} (${money(round2(minQ * price))}) to keep fees under ${DRAG_HIGH}%`);
-    }else if(!minQ){
-      parts.push(`fees stay above ${DRAG_HIGH}% at this price`);
-    }
-  }
+  if(rt.pct > DRAG_HIGH) parts.push(...dragSuggestion(price, shares, opt));
   $("s" + prefix + "Drag").textContent = parts.join(" · ");
+}
+
+function dragLevel(pct){
+  if(pct <= DRAG_LOW) return ["Low", "pos"];
+  if(pct <= DRAG_HIGH) return ["Moderate", "warn"];
+  return ["High", "neg"];
+}
+
+/** Smallest order (Bursa lots / US whole shares) that brings fee drag under DRAG_HIGH. */
+function dragSuggestion(price, shares, opt){
+  const bursa = state.market === "bursa";
+  const minQ = FE.minOrderForDrag(state.market, price, opt, state.rates, bursa ? 100 : 1, DRAG_HIGH);
+  if(!minQ) return [`fees stay above ${DRAG_HIGH}% at this price`];
+  if(minQ <= shares) return [];
+  const size = bursa ? plural(minQ / 100, "lot") : plural(minQ, "share");
+  return [`buy at least ${size} (${money(round2(minQ * price))}) to keep fees under ${DRAG_HIGH}%`];
 }
 
 /** Shares for a budget: Bursa in board lots of 100, US in whole shares, US fractional if under one share. */
 function calcBudget(opt){
   const b = readNum("budgetAmt"), p = readNum("budgetPrice");
   const bursa = state.market === "bursa";
-  let r = maxShares(b.v, p.v, opt, bursa ? 100 : 1);
-  let frac = false;
-  if(!bursa && r.shares === 0 && b.v > 0 && p.v > 0){
-    const fr = maxShares(b.v, p.v, opt, 0.0001, 0.9999);
-    if(fr.shares > 0){ r = fr; frac = true; }
-  }
-  const ready = b.v > 0 && p.v > 0;
+  const ready = isPos(b.v) && isPos(p.v);
+  const { r, frac } = budgetResult(b.v, p.v, opt, bursa, ready);
   const got = r.shares > 0;
-  $("tBudget").className = "tile main " + (got ? "pos" : "hl");
-  if(!ready){
-    $("vBudget").textContent = "—"; $("sBudget").textContent = "Enter budget and buy price";
-  }else if(got){
-    const lots = r.shares / 100;
-    $("vBudget").textContent = bursa ? `${qtyFmt(lots)} lot${lots === 1 ? "" : "s"}` : frac ? `${fmt(r.shares, 4)} share` : `${qtyFmt(r.shares)} share${r.shares === 1 ? "" : "s"}`;
-    $("sBudget").textContent = bursa ? `${qtyFmt(r.shares)} shares · fees included` : frac ? "Fractional order · fees included" : "Whole shares · fees included";
-  }else{
-    $("vBudget").textContent = bursa ? "0 lots" : "0 shares";
-    $("sBudget").textContent = "Budget too small for one " + (bursa ? "lot" : "share");
-  }
+
+  renderBudgetHeadline(r, frac, bursa, ready);
   $("vBudCost").textContent = got ? money(r.cost) : "—";
   $("vBudLeft").textContent = ready ? money(r.left) : "—";
-  $("tBudNext").hidden = frac;
   renderDrag("Bud", got ? p.v : 0, r.shares, opt);
-  $("kBudNext").textContent = bursa ? "Next lot needs" : "Next share needs";
-  $("vBudNext").textContent = ready && r.nextShortfall > 0 ? "+" + money(r.nextShortfall) : "—";
-  $("sBudNext").textContent = ready && r.nextShortfall > 0 ? `More cash for ${bursa ? "100 more shares" : "1 more share"}, fees included` : "Extra cash for one more";
-
-  const body = $("budgetRows"); body.replaceChildren();
-  const trV = el("tr"); trV.append(labelCell("Trade value"), valCell(r.value, got)); body.append(trV);
-  for(const [key, label, note] of rowDefs()){
-    if(key === "sec" || key === "taf") continue;
-    const tr = el("tr"); tr.append(labelCell(label, note), valCell(r.fees.lines[key] || 0, got)); body.append(tr);
-  }
-  const trT = el("tr", "sum"); trT.append(labelCell("Total fees"), valCell(r.fees.total, got)); body.append(trT);
+  renderBudgetNext(r, frac, bursa, ready);
+  renderBuyFeeTable("budgetRows", r.value, r.fees, got);
 
   const notes = [];
   const bad = ![b, p].every(x => x.ok);
   if(bad) notes.push("Some inputs are invalid — use positive numbers only.");
-  if(!bursa && !(opt.fx > 0)) notes.push("Enter a valid USD/MYR rate for stamp duty.");
+  if(!hasFx(opt)) notes.push("Enter a valid USD/MYR rate for stamp duty.");
   if(bursa) notes.push("Bursa normal board trades in lots of 100 shares.");
   if(frac) notes.push("Budget is under one share, so this is a fractional order (no commission, % platform fee). Check the app for any minimum order size.");
-  showNote("budgetNote", notes, bad || (!bursa && !(opt.fx > 0)));
+  showNote("budgetNote", notes, bad || !hasFx(opt));
+}
+
+/** Bursa in board lots of 100; US in whole shares, falling back to a fractional order below one share. */
+function budgetResult(budget, px, opt, bursa, ready){
+  const whole = maxShares(budget, px, opt, bursa ? 100 : 1);
+  if(bursa || whole.shares > 0 || !ready) return { r: whole, frac: false };
+  const fr = maxShares(budget, px, opt, 0.0001, 0.9999);
+  return fr.shares > 0 ? { r: fr, frac: true } : { r: whole, frac: false };
+}
+
+function budgetQty(r, frac, bursa){
+  if(bursa) return plural(r.shares / 100, "lot");
+  if(frac) return `${fmt(r.shares, 4)} share`;
+  return plural(r.shares, "share");
+}
+
+function renderBudgetHeadline(r, frac, bursa, ready){
+  const got = r.shares > 0;
+  $("tBudget").className = "tile main " + (got ? "pos" : "hl");
+  let v = "—", sub = "Enter budget and buy price";
+  if(ready && got){
+    v = budgetQty(r, frac, bursa);
+    if(bursa) sub = `${qtyFmt(r.shares)} shares · fees included`;
+    else sub = frac ? "Fractional order · fees included" : "Whole shares · fees included";
+  }else if(ready){
+    v = bursa ? "0 lots" : "0 shares";
+    sub = "Budget too small for one " + (bursa ? "lot" : "share");
+  }
+  $("vBudget").textContent = v;
+  $("sBudget").textContent = sub;
+}
+
+function renderBudgetNext(r, frac, bursa, ready){
+  $("tBudNext").hidden = frac;
+  const show = ready && r.nextShortfall > 0;
+  $("kBudNext").textContent = bursa ? "Next lot needs" : "Next share needs";
+  $("vBudNext").textContent = show ? "+" + money(r.nextShortfall) : "—";
+  const unit = bursa ? "100 more shares" : "1 more share";
+  $("sBudNext").textContent = show ? `More cash for ${unit}, fees included` : "Extra cash for one more";
 }
 
 function showNote(id, notes, warn){
