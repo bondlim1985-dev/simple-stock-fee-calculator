@@ -77,10 +77,15 @@
     <div><label for="sellPrice" class="cur">Sell price (optional)</label><input id="sellPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
     <div><label for="targetPct">Target profit % <span class="lbl-note">(optional)</span></label><input id="targetPct" inputmode="decimal" autocomplete="off" placeholder="e.g. 10"></div>
   </div>
+  <div class="grid" id="usMyrInputs" hidden>
+    <div><label for="buyFx">USD/MYR when bought <span class="lbl-note">(optional)</span></label><input id="buyFx" inputmode="decimal" autocomplete="off" placeholder="today's rate"></div>
+    <div><label for="fxCost">FX conversion cost % <span class="lbl-note">(optional)</span></label><input id="fxCost" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+  </div>
 
   <h2>Result</h2>
   <div class="tiles">
     <div class="tile main" id="tPnl"><div><div class="k">Net profit / loss</div><div class="s" id="tRet">Enter a sell price</div></div><div class="v" id="vPnl">—</div></div>
+    <div class="tile full" id="tMyr" hidden><div class="k">P/L in MYR</div><div class="v" id="vMyr">—</div><div class="s" id="sMyr"></div></div>
     <div class="tile"><div class="k">Total cash out</div><div class="v" id="vCash">—</div><div class="s">Buy value + buy fees</div></div>
     <div class="tile"><div class="k">Net received</div><div class="v" id="vNet">—</div><div class="s">Sell value − sell fees</div></div>
     <div class="tile hl full"><div class="k">Break-even sell price</div><div class="v" id="vBe">—</div><div class="s" id="sBe">Covers buy + sell fees</div></div>
