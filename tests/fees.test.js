@@ -93,6 +93,21 @@ test("us: matches real Moomoo fractional sell — VOO 0.3 @ 709.12 (4 Aug 2026, 
   });
 });
 
+test("us: matches real Moomoo fractional buy — MU 0.3 @ 767.59 (29 Jul 2026, USD/MYR ~4.2)", () => {
+  assert.deepEqual(us(230.28, 0.3, "buy", { fx: 4.2 }), {
+    lines: { commission: 0, platform: 0.99, settlement: 0, sec: 0, taf: 0, cat: 0, stamp: 0.24, sst: 0 },
+    total: 1.23, frac: true
+  });
+});
+
+test("us: matches real Moomoo sell — MU 1 @ 965.38 (13 Aug 2026, USD/MYR ~4.09)", () => {
+  // First real sell with SEC, TAF and CAT lines: SEC 0.0199 -> 0.02, TAF minimum 0.01, CAT rounds to 0
+  assert.deepEqual(us(965.38, 1, "sell", { fx: 4.09 }), {
+    lines: { commission: 0.29, platform: 0.99, settlement: 0, sec: 0.02, taf: 0.01, cat: 0, stamp: 0.98, sst: 0 },
+    total: 2.29, frac: false
+  });
+});
+
 test("us: USD1,000 buy (10 shares) at 4.20", () => {
   assert.deepEqual(us(1000, 10, "buy"), {
     lines: { commission: 0.3, platform: 0.99, settlement: 0.03, sec: 0, taf: 0, cat: 0, stamp: 1.19, sst: 0 },

@@ -47,9 +47,9 @@ const RATE_NOTES = Object.freeze({
     sstPct: "8% SST on non-ordinary products — from 1 Oct 2025"
   }),
   us: Object.freeze({
-    secPerM: "SEC Section 31 rate — from 4 Apr 2026",
-    taf: "FINRA TAF — from 1 Jan 2026",
-    catNms: "Unconfirmed — not shown on 1-share orders; verify on a large order",
+    secPerM: "SEC Section 31 rate — from 4 Apr 2026; verified on a real sell (Aug 2026)",
+    taf: "FINRA TAF — from 1 Jan 2026; USD0.01 minimum verified (Aug 2026)",
+    catNms: "Charged per share (line confirmed Aug 2026); rate unconfirmed — rounds to 0 below ~1,700 shares",
     fracPlatPct: "USD0.99 cap verified (Aug 2026); the 0.99% rate itself is unconfirmed",
     sstPct: "Not charged on US trades (verified Mar/Aug 2026) — leave unticked",
     commPct: "0.03% and USD0.99 platform fee verified on a real 1-share buy (Mar 2026)"
