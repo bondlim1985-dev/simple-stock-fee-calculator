@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src https://api.frankfurter.dev; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0f2b4c">
+<title>Moomoo Fee Calculator</title>
+<style>
+:root{
+  --bg:#f2f5f9;--card:#fff;--ink:#14213a;--muted:#66728a;--faint:#8e98ab;--line:#e1e7ef;--field:#fff;--field-line:#cdd6e2;
+  --brand:#0f2b4c;--brand-ink:#fff;--accent:#ff6a00;--soft:#f6f8fb;
+  --pos:#12804a;--pos-bg:#e8f7ee;--neg:#c42b3f;--neg-bg:#fdecee;--hl:#a02b62;--hl-bg:#fdf0f6;
+  --radius:12px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1320;--card:#141d2c;--ink:#e6ebf3;--muted:#98a3b6;--faint:#6f7a8e;--line:#243145;--field:#0f1826;--field-line:#2d3b52;
+  --brand:#3d7fd1;--brand-ink:#fff;--soft:#101929;--pos:#4cc98a;--pos-bg:#12301f;--neg:#ff7d8c;--neg-bg:#3a1820;--hl:#f08cbb;--hl-bg:#34172a;
+}}
+:root[data-theme="dark"]{
+  --bg:#0c1320;--card:#141d2c;--ink:#e6ebf3;--muted:#98a3b6;--faint:#6f7a8e;--line:#243145;--field:#0f1826;--field-line:#2d3b52;
+  --brand:#3d7fd1;--brand-ink:#fff;--soft:#101929;--pos:#4cc98a;--pos-bg:#12301f;--neg:#ff7d8c;--neg-bg:#3a1820;--hl:#f08cbb;--hl-bg:#34172a;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:560px;margin:0 auto;padding:12px 12px calc(16px + env(safe-area-inset-bottom))}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:2px 8px;margin:2px 2px 10px}
+h1{font-size:18px;margin:0;letter-spacing:-.2px;white-space:nowrap}
+.asof{font-size:11px;color:var(--faint);white-space:nowrap}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+.seg+.seg{margin-top:6px}
+.seg button{appearance:none;border:0;background:transparent;color:var(--muted);font:600 13px/1 inherit;padding:9px 6px;border-radius:7px;cursor:pointer}
+.seg button[aria-selected="true"]{background:var(--brand);color:var(--brand-ink);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin-top:10px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.full{grid-column:1/-1}
+label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin:0 0 4px}
+input,select{width:100%;height:40px;border:1px solid var(--field-line);border-radius:8px;background:var(--field);color:var(--ink);padding:0 10px;font:16px/1 inherit;font-variant-numeric:tabular-nums}
+input:focus,select:focus{outline:2px solid color-mix(in srgb,var(--brand) 35%,transparent);border-color:var(--brand)}
+input.bad{border-color:var(--neg);background:var(--neg-bg)}
+.hint{font-size:10.5px;color:var(--faint);margin-top:3px}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;padding-top:10px;border-top:1px dashed var(--line)}
+.check{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);font-weight:500;margin:0;min-height:40px;cursor:pointer}
+.check input{width:18px;height:18px;margin:0;accent-color:var(--brand);flex:none}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tile{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--soft);min-width:0}
+.tile .k{font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.tile .v{font-size:15px;font-weight:700;margin-top:2px;overflow-wrap:anywhere}
+.tile .s{font-size:10.5px;color:var(--faint);margin-top:1px}
+.tile.main{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.tile.main .v{font-size:20px;margin:0;white-space:nowrap;overflow-wrap:normal}
+.tile.pos{background:var(--pos-bg);border-color:transparent;color:var(--pos)}
+.tile.neg{background:var(--neg-bg);border-color:transparent;color:var(--neg)}
+.tile.hl{background:var(--hl-bg);border-color:transparent;color:var(--hl)}
+.tile.pos .k,.tile.neg .k,.tile.hl .k,.tile.pos .s,.tile.neg .s,.tile.hl .s{color:inherit;opacity:.8}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:14px 0 6px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:5px 0;text-align:right;white-space:nowrap}
+th{font-size:10.5px;color:var(--faint);font-weight:600;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left;white-space:normal;padding-right:8px}
+td:first-child small{display:block;color:var(--faint);font-size:10px;line-height:1.25}
+td+td,th+th{padding-left:10px;width:30%}
+tr.sum td{border-top:1px solid var(--line);font-weight:700;padding-top:7px}
+tr.grand td{font-weight:700;color:var(--brand)}
+td.na{color:var(--faint)}
+.note{font-size:11px;color:var(--muted);background:var(--soft);border-radius:8px;padding:7px 9px;margin-top:8px}
+.note.warn{background:var(--neg-bg);color:var(--neg)}
+details{margin-top:10px}
+summary{cursor:pointer;font-weight:600;font-size:13px;list-style:none;display:flex;justify-content:space-between;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"＋";color:var(--muted)}
+details[open] summary::after{content:"－"}
+.rates{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.rules{margin:10px 0 0;padding-left:18px;font-size:11.5px;color:var(--muted)}
+.rules li{margin:3px 0}
+.btn{appearance:none;border:1px solid var(--field-line);background:var(--field);color:var(--ink);border-radius:8px;padding:8px 12px;font:600 12px inherit;cursor:pointer;margin-top:10px}
+
+.lbl-note{font-weight:500;color:var(--faint)}
+.fx-row{display:flex;gap:6px}
+.fx-row input{flex:1;min-width:0}
+.fx-btn{margin:0;height:40px;flex:none;white-space:nowrap}
+.fx-btn:disabled{opacity:.6;cursor:progress}
+#fxStatus.ok{color:var(--pos)}
+#fxStatus.err{color:var(--neg)}
+footer{font-size:10.5px;color:var(--faint);margin:12px 4px 0;line-height:1.5}
+[hidden]{display:none!important}
+@media (max-width:360px){.wrap{padding:10px 8px}.card{padding:10px}.grid,.opts{gap:6px}.tile .v{font-size:14px}.tile.main .v{font-size:18px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Moomoo Fee Calculator</h1>
+  <span class="asof">Moomoo MY schedule · Sep 2026</span>
+</header>
+
+<div class="seg" role="tablist" aria-label="Market">
+  <button role="tab" id="mkBursa" data-market="bursa" aria-selected="true">🇲🇾 Bursa · MYR</button>
+  <button role="tab" id="mkUs" data-market="us" aria-selected="false">🇺🇸 US · USD</button>
+</div>
+<div class="seg" role="tablist" aria-label="Calculator">
+  <button role="tab" id="cTrade" data-calc="trade" aria-selected="true">Trade P/L</button>
+  <button role="tab" id="cAvg" data-calc="avg" aria-selected="false">Average Cost</button>
+</div>
+
+<!-- Shared market options -->
+<section class="card" aria-label="Order settings">
+  <div class="grid">
+    <div id="optBursa" class="full">
+      <label for="bursaType">Product type</label>
+      <select id="bursaType">
+        <option value="ordinary">Ordinary shares</option>
+        <option value="etf">ETF (stamp duty exempt, SST applies)</option>
+        <option value="reit">REIT (SST applies)</option>
+        <option value="warrant">Warrant / structured warrant (SST applies)</option>
+        <option value="other">Rights / business trust / stapled (SST applies)</option>
+      </select>
+    </div>
+    <div id="optUsType" class="full" hidden>
+      <label for="usType">Where the stock trades <span class="lbl-note">(sets CAT fee)</span></label>
+      <select id="usType">
+        <option value="nms">NYSE / Nasdaq (NMS) — most stocks</option>
+        <option value="otc">Over-the-counter (OTC)</option>
+      </select>
+    </div>
+    <div id="optUsFx" class="full" hidden>
+      <label for="fx">USD/MYR rate <span class="lbl-note">(for MY stamp duty)</span></label>
+      <div class="fx-row">
+        <input id="fx" inputmode="decimal" autocomplete="off" value="4.20">
+        <button type="button" class="btn fx-btn" id="fxRefresh" aria-label="Fetch live USD/MYR rate">↻ Live</button>
+      </div>
+      <div class="hint" id="fxStatus" aria-live="polite">Default rate — tap Live to fetch</div>
+    </div>
+  </div>
+  <div class="opts">
+    <label class="check"><input type="checkbox" id="promo"> 0% commission promo</label>
+    <label class="check" id="usSstWrap" hidden><input type="checkbox" id="usSst"> Add 8% SST on fees</label>
+  </div>
+</section>
+
+<!-- Trade calculator -->
+<section id="pTrade" class="card" aria-label="Trade calculator">
+  <div class="grid">
+    <div><label for="buyPrice" class="cur">Buy price</label><input id="buyPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+    <div><label for="qty">Quantity (shares)</label><input id="qty" inputmode="decimal" autocomplete="off" placeholder="0"><div class="hint" id="qtyHint"></div></div>
+    <div class="full"><label for="sellPrice" class="cur">Sell price (optional)</label><input id="sellPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+  </div>
+
+  <h2>Result</h2>
+  <div class="tiles">
+    <div class="tile main" id="tPnl"><div><div class="k">Net profit / loss</div><div class="s" id="tRet">Enter a sell price</div></div><div class="v" id="vPnl">—</div></div>
+    <div class="tile"><div class="k">Total cash out</div><div class="v" id="vCash">—</div><div class="s">Buy value + buy fees</div></div>
+    <div class="tile"><div class="k">Net received</div><div class="v" id="vNet">—</div><div class="s">Sell value − sell fees</div></div>
+    <div class="tile hl full" style="grid-column:1/-1"><div class="k">Break-even sell price</div><div class="v" id="vBe">—</div><div class="s" id="sBe">Covers buy + sell fees</div></div>
+  </div>
+
+  <h2>Fee breakdown</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Buy</th><th>Sell</th></tr></thead>
+    <tbody id="tradeRows"></tbody>
+  </table>
+  <div id="tradeNote" class="note" hidden></div>
+</section>
+
+<!-- Average cost calculator -->
+<section id="pAvg" class="card" aria-label="Average cost calculator" hidden>
+  <div class="grid">
+    <div><label for="curAvg" class="cur">Current avg price</label><input id="curAvg" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+    <div><label for="curQty">Current shares</label><input id="curQty" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+    <div><label for="addPrice" class="cur">New buy price</label><input id="addPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+    <div><label for="addQty">New shares</label><input id="addQty" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+  </div>
+
+  <h2>Result</h2>
+  <div class="tiles">
+    <div class="tile main hl" id="tAvg"><div><div class="k">New average cost</div><div class="s" id="sAvg">Incl. new buy fees</div></div><div class="v" id="vAvg">—</div></div>
+    <div class="tile"><div class="k">Total shares</div><div class="v" id="vTotQty">0</div></div>
+    <div class="tile"><div class="k">Total cost</div><div class="v" id="vTotCost">—</div></div>
+    <div class="tile"><div class="k">Current cost</div><div class="v" id="vCurCost">—</div></div>
+    <div class="tile"><div class="k">New buy cash out</div><div class="v" id="vAddCash">—</div></div>
+  </div>
+
+  <h2>New buy fees</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Amount</th></tr></thead>
+    <tbody id="avgRows"></tbody>
+  </table>
+  <div id="avgNote" class="note" hidden></div>
+</section>
+
+<section class="card">
+  <details id="rateBox">
+    <summary>Fee schedule &amp; editable rates</summary>
+    <ul class="rules" id="rules"></ul>
+    <div class="rates" id="rateFields"></div>
+    <button type="button" class="btn" id="resetRates">Reset to defaults</button>
+  </details>
+</section>
+
+<footer>
+  Estimates only, based on Moomoo Securities Malaysia's published fee schedule. Regulatory rates (SEC, TAF, CAT) and FX change;
+  verify against your contract note. Values stay in this browser — nothing is sent anywhere.
+</footer>
+</div>
+
+<script>
+"use strict";
+(() => {
+const $ = id => document.getElementById(id);
+
+/* ---------- Fee schedule defaults (editable in UI) ---------- */
+const DEFAULTS = {
+  bursa: {
+    commPct: 0.03,      // % of value, rounded UP to RM0.01, no minimum
+    platform: 3,        // RM per order
+    clearPct: 0.03,     // % of value
+    clearCap: 1000,     // RM
+    stampPer1k: 1,      // RM per RM1,000 or part thereof
+    stampCap: 1000,     // RM
+    sstPct: 8           // on commission + platform + clearing (non-ordinary products)
+  },
+  us: {
+    commPct: 0.03,      // % of value
+    platform: 0.99,     // USD per order (>= 1 share)
+    fracPlatPct: 0.99,  // % of value for orders < 1 share
+    fracPlatCap: 0.99,  // USD cap for orders < 1 share
+    settle: 0.003,      // USD per share
+    settleCapPct: 1,    // % of value
+    secPerM: 20.6,      // USD per USD1m sold (from 4 Apr 2026)
+    secMin: 0.01,
+    taf: 0.000195,      // USD per share sold (2026)
+    tafMin: 0.01,
+    tafMax: 9.79,
+    catNms: 0.000003,   // USD per share
+    catOtc: 0.00000003, // USD per share
+    stampPer1k: 1,      // RM per RM1,000 or part (Malaysian contract-note stamp duty)
+    stampCap: 1000,     // RM
+    sstPct: 8
+  }
+};
+
+const RATE_FIELDS = {
+  bursa: [
+    ["commPct","Commission %"],["platform","Platform fee (RM)"],
+    ["clearPct","Clearing %"],["clearCap","Clearing cap (RM)"],
+    ["stampPer1k","Stamp duty per RM1k"],["stampCap","Stamp duty cap (RM)"],
+    ["sstPct","SST %"]
+  ],
+  us: [
+    ["commPct","Commission %"],["platform","Platform fee ($)"],
+    ["fracPlatPct","Fractional platform %"],["fracPlatCap","Fractional platform cap ($)"],
+    ["settle","Settlement $/share"],["settleCapPct","Settlement cap %"],
+    ["secPerM","SEC $ per $1m sold"],["secMin","SEC min ($)"],
+    ["taf","TAF $/share sold"],["tafMax","TAF max ($)"],
+    ["catNms","CAT NMS $/share"],["catOtc","CAT OTC $/share"],
+    ["stampPer1k","Stamp duty per RM1k"],["stampCap","Stamp duty cap (RM)"],
+    ["sstPct","SST %"]
+  ]
+};
+
+/* ---------- State ---------- */
+const STORE_KEY = "moomooFeeCalc.v17";
+const state = { market: "bursa", calc: "trade", rates: clone(DEFAULTS) };
+
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function load(){
+  try{
+    const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+    if(!s) return;
+    if(s.market === "bursa" || s.market === "us") state.market = s.market;
+    if(s.calc === "trade" || s.calc === "avg") state.calc = s.calc;
+    for(const m of ["bursa","us"]) for(const k in DEFAULTS[m]){
+      const v = s.rates && s.rates[m] && s.rates[m][k];
+      if(typeof v === "number" && Number.isFinite(v) && v >= 0) state.rates[m][k] = v;
+    }
+    if(typeof s.fx === "string") $("fx").value = s.fx;
+    if(s.fxMode === "manual" || s.fxMode === "live") fx.mode = s.fxMode;
+    if(s.fxLive && validFx(s.fxLive.rate) && typeof s.fxLive.date === "string" && typeof s.fxLive.at === "number") fx.live = s.fxLive;
+    if(typeof s.bursaType === "string" && $("bursaType").querySelector(`option[value="${CSS.escape(s.bursaType)}"]`)) $("bursaType").value = s.bursaType;
+    if(s.usType === "nms" || s.usType === "otc") $("usType").value = s.usType;
+    $("promo").checked = !!s.promo;
+    $("usSst").checked = !!s.usSst;
+  }catch(_){ /* storage unavailable or corrupt: use defaults */ }
+}
+function save(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      market: state.market, calc: state.calc, rates: state.rates,
+      fx: $("fx").value, bursaType: $("bursaType").value, usType: $("usType").value,
+      promo: $("promo").checked, usSst: $("usSst").checked,
+      fxMode: fx.mode, fxLive: fx.live
+    }));
+  }catch(_){}
+}
+
+/* ---------- Live FX (ECB reference rate via Frankfurter) ---------- */
+const FX_URL = "https://api.frankfurter.dev/v1/latest?base=USD&symbols=MYR";
+const FX_TTL_MS = 60 * 60 * 1000;      // re-fetch at most hourly
+const fx = { mode: "live", live: null, busy: false };
+
+function validFx(v){ return typeof v === "number" && Number.isFinite(v) && v > 1 && v < 10; }
+function fxStatus(text, cls){ const n = $("fxStatus"); n.textContent = text; n.className = "hint" + (cls ? " " + cls : ""); }
+function fxDateLabel(d){
+  const t = Date.parse(d + "T00:00:00Z");
+  return Number.isFinite(t) ? new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : d;
+}
+function showFxState(){
+  if(fx.busy) return fxStatus("Fetching live rate…");
+  if(fx.mode === "manual") return fxStatus("Manual rate — tap Live to use the market rate");
+  if(fx.live) return fxStatus(`ECB reference rate · ${fxDateLabel(fx.live.date)}`, "ok");
+  fxStatus("Default rate — tap Live to fetch");
+}
+async function fetchFx(force){
+  if(fx.busy) return;
+  if(!force && fx.live && Date.now() - fx.live.at < FX_TTL_MS){
+    if(fx.mode === "live"){ $("fx").value = fx.live.rate.toFixed(4); update(false); }
+    return showFxState();
+  }
+  fx.busy = true; $("fxRefresh").disabled = true; showFxState();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 6000);
+  try{
+    const res = await fetch(FX_URL, { signal: ctrl.signal, credentials: "omit", referrerPolicy: "no-referrer", cache: "no-store" });
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const rate = data && data.rates && data.rates.MYR;
+    const date = data && typeof data.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.date) ? data.date : "";
+    if(!validFx(rate) || !date) throw new Error("Unexpected response");
+    fx.live = { rate, date, at: Date.now() };
+    fx.mode = "live";
+    $("fx").value = rate.toFixed(4);
+    $("fx").classList.remove("bad");
+    fx.busy = false; showFxState();
+  }catch(_){
+    fx.busy = false;
+    if(fx.live) $("fx").value = fx.live.rate.toFixed(4);
+    fxStatus(fx.live ? `Offline — using last live rate (${fxDateLabel(fx.live.date)})` : "Couldn't fetch live rate — using the rate shown", "err");
+  }finally{
+    clearTimeout(timer);
+    $("fxRefresh").disabled = false;
+    update(false);
+  }
+}
+
+/* ---------- Numeric helpers (cent-safe rounding) ---------- */
+const EPS = 1e-9;
+const round2 = n => Math.round((n + EPS) * 100) / 100;          // half-up to cent
+const ceil2  = n => Math.ceil(n * 100 - 1e-7) / 100;             // up to cent, tolerant of FP noise
+const sum = o => Object.values(o).reduce((a, b) => a + b, 0);
+
+/** Parse a field. Returns {v, ok}. Empty = 0 (ok). Negative / junk = invalid. */
+function readNum(id){
+  const el = $(id);
+  const raw = el.value.replace(/[,\s]/g, "");
+  if(raw === ""){ el.classList.remove("bad"); return { v: 0, ok: true, empty: true }; }
+  const ok = /^\d*\.?\d+$|^\d+\.$/.test(raw);
+  const v = ok ? Number(raw) : NaN;
+  const good = ok && Number.isFinite(v);
+  el.classList.toggle("bad", !good);
+  return { v: good ? v : 0, ok: good, empty: false };
+}
+
+/* ---------- Fee engines ---------- */
+const SST_BURSA = new Set(["etf","reit","warrant","other"]);
+
+function bursaFees(value, opt){
+  const r = state.rates.bursa;
+  if(!(value > 0)) return { lines: {}, total: 0 };
+  const commission = opt.promo ? 0 : ceil2(value * r.commPct / 100);
+  const platform   = r.platform;
+  const clearing   = round2(Math.min(value * r.clearPct / 100, r.clearCap));
+  const stamp      = opt.type === "etf" ? 0 : Math.min(Math.ceil(value / 1000 - EPS) * r.stampPer1k, r.stampCap);
+  const sst        = SST_BURSA.has(opt.type) ? round2((commission + platform + clearing) * r.sstPct / 100) : 0;
+  const lines = { commission, platform, clearing, stamp, sst };
+  return { lines, total: round2(sum(lines)) };
+}
+
+function usFees(value, shares, side, opt){
+  const r = state.rates.us;
+  if(!(value > 0) || !(shares > 0)) return { lines: {}, total: 0, frac: false };
+  const frac = shares < 1;
+  const sell = side === "sell";
+  const commission = opt.promo ? 0 : round2(value * r.commPct / 100);
+  const platform   = frac ? round2(Math.min(value * r.fracPlatPct / 100, r.fracPlatCap)) : r.platform;
+  // Orders < 1 share: no settlement, SEC or TAF.
+  const settlement = frac ? 0 : round2(Math.min(shares * r.settle, value * r.settleCapPct / 100));
+  const sec = sell && !frac ? Math.max(ceil2(value * r.secPerM / 1e6), r.secMin) : 0;
+  const taf = sell && !frac ? Math.min(Math.max(ceil2(shares * r.taf), r.tafMin), r.tafMax) : 0;
+  const cat = round2(shares * (opt.usType === "otc" ? r.catOtc : r.catNms));
+  let stamp = 0;
+  if(opt.fx > 0){
+    const stampMyr = Math.min(Math.ceil(value * opt.fx / 1000 - EPS) * r.stampPer1k, r.stampCap);
+    stamp = round2(stampMyr / opt.fx);
+  }
+  const sst = opt.usSst ? round2((commission + platform) * r.sstPct / 100) : 0;
+  const lines = { commission, platform, settlement, sec, taf, cat, stamp, sst };
+  return { lines, total: round2(sum(lines)), frac };
+}
+
+function fees(value, shares, side, opt){
+  return state.market === "us" ? usFees(value, shares, side, opt) : bursaFees(value, opt);
+}
+
+/* ---------- Tick size (for rounding break-even up to a tradable price) ---------- */
+function tickFor(price){
+  if(state.market === "us") return price < 1 ? 0.0001 : 0.01;
+  if(price < 1) return 0.005;
+  if(price < 10) return 0.01;
+  if(price < 100) return 0.02;
+  return 0.1;
+}
+function roundUpTick(p){
+  let t = tickFor(p);
+  let q = Math.ceil(p / t - 1e-7) * t;
+  // Crossing a tick band boundary can change the tick; re-snap once.
+  t = tickFor(q);
+  q = Math.ceil(p / t - 1e-7) * t;
+  return Number(q.toFixed(4));
+}
+
+function breakEven(cashOut, shares, opt){
+  if(!(cashOut > 0) || !(shares > 0)) return 0;
+  const net = p => { const v = p * shares; return v - fees(v, shares, "sell", opt).total; };
+  let lo = 0, hi = Math.max(0.01, cashOut / shares * 1.5), guard = 0;
+  while(net(hi) < cashOut && guard++ < 60) hi *= 2;
+  if(net(hi) < cashOut) return 0;
+  for(let i = 0; i < 80; i++){ const mid = (lo + hi) / 2; if(net(mid) >= cashOut) hi = mid; else lo = mid; }
+  return hi;
+}
+
+/* ---------- Formatting ---------- */
+const cur = () => state.market === "us" ? "$" : "RM";
+function fmt(n, min, max){ return Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: min, maximumFractionDigits: max ?? min }); }
+function money(n){ const s = n < 0 ? "−" : ""; return s + cur() + fmt(Math.abs(n), 2); }
+function signed(n){ return (n > 0 ? "+" : "") + money(n); }
+function price(n){ return cur() + fmt(n, state.market === "us" && n >= 1 ? 2 : 3, 4); }
+function qtyFmt(n){ return fmt(n, 0, 4); }
+
+/* ---------- Row definitions ---------- */
+function rowDefs(){
+  const r = state.rates[state.market];
+  if(state.market === "bursa"){
+    const t = $("bursaType").value;
+    return [
+      ["commission","Brokerage", `${r.commPct}%, rounded up to 1 sen${$("promo").checked ? " · promo 0%" : ""}`],
+      ["platform","Platform fee", `RM${fmt(r.platform,2)} per order`],
+      ["clearing","Clearing fee", `${r.clearPct}%, max RM${fmt(r.clearCap,0)}`],
+      ["stamp","Stamp duty", t === "etf" ? "ETF exempt (to 31 Dec 2028)" : `RM${r.stampPer1k} per RM1,000 or part, max RM${fmt(r.stampCap,0)}`],
+      ...(SST_BURSA.has(t) ? [["sst","SST", `${r.sstPct}% on brokerage, platform & clearing`]] : [])
+    ];
+  }
+  const rows = [
+    ["commission","Commission", `${r.commPct}% of value${$("promo").checked ? " · promo 0%" : ""}`],
+    ["platform","Platform fee", `$${r.platform}/order · <1 share: ${r.fracPlatPct}%, max $${r.fracPlatCap}`],
+    ["settlement","Settlement fee", `$${r.settle}/share, max ${r.settleCapPct}% of value`],
+    ["sec","SEC fee", `Sell only · $${r.secPerM}/$1m, min $${r.secMin}`],
+    ["taf","FINRA TAF", `Sell only · $${r.taf}/share, max $${r.tafMax}`],
+    ["cat","CAT fee", $("usType").value === "otc" ? `OTC stock · $${r.catOtc}/share` : `NYSE/Nasdaq (NMS) · $${r.catNms}/share`],
+    ["stamp","MY stamp duty", `RM${r.stampPer1k} per RM1,000 or part, max RM${fmt(r.stampCap,0)}, at FX`]
+  ];
+  if($("usSst").checked) rows.push(["sst","SST", `${r.sstPct}% on commission & platform`]);
+  return rows;
+}
+
+function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
+function labelCell(label, note){
+  const td = el("td"); td.append(label);
+  if(note){ const s = el("small", null, note); td.append(s); }
+  return td;
+}
+function valCell(v, active){
+  return active ? el("td", null, money(v)) : el("td", "na", "—");
+}
+
+/* ---------- Calculators ---------- */
+function options(){
+  const fx = readNum("fx");
+  return {
+    promo: $("promo").checked,
+    type: $("bursaType").value,
+    usType: $("usType").value,
+    usSst: $("usSst").checked,
+    fx: fx.v
+  };
+}
+
+function calcTrade(opt){
+  const bp = readNum("buyPrice"), q = readNum("qty"), sp = readNum("sellPrice");
+  const shares = q.v;
+  const buyValue = round2(bp.v * shares);
+  const hasBuy = buyValue > 0;
+  const hasSell = sp.v > 0 && shares > 0;
+  const sellValue = hasSell ? round2(sp.v * shares) : 0;
+
+  const bf = fees(buyValue, shares, "buy", opt);
+  const sf = hasSell ? fees(sellValue, shares, "sell", opt) : { lines: {}, total: 0 };
+  const cashOut = round2(buyValue + bf.total);
+  const netIn = round2(sellValue - sf.total);
+
+  // Table
+  const body = $("tradeRows"); body.replaceChildren();
+  const trV = el("tr"); trV.append(labelCell("Trade value"), valCell(buyValue, hasBuy), valCell(sellValue, hasSell)); body.append(trV);
+  for(const [key, label, note] of rowDefs()){
+    const tr = el("tr");
+    const buyApplies = !(key === "sec" || key === "taf");
+    tr.append(labelCell(label, note),
+      buyApplies ? valCell(bf.lines[key] || 0, hasBuy) : el("td", "na", "—"),
+      valCell(sf.lines[key] || 0, hasSell));
+    body.append(tr);
+  }
+  const trT = el("tr", "sum"); trT.append(labelCell("Total fees"), valCell(bf.total, hasBuy), valCell(sf.total, hasSell)); body.append(trT);
+  const trG = el("tr", "grand"); trG.append(labelCell("Cash out / Net in"), valCell(cashOut, hasBuy), valCell(netIn, hasSell)); body.append(trG);
+
+  // Tiles
+  $("vCash").textContent = hasBuy ? money(cashOut) : "—";
+  $("vNet").textContent  = hasSell ? money(netIn) : "—";
+  const tile = $("tPnl");
+  tile.className = "tile main";
+  if(hasBuy && hasSell){
+    const pnl = round2(netIn - cashOut);
+    const gross = round2(sellValue - buyValue);
+    $("vPnl").textContent = signed(pnl);
+    $("tRet").textContent = `${pnl >= 0 ? "+" : ""}${fmt(pnl / cashOut * 100, 2)}% · gross ${signed(gross)} · fees ${money(bf.total + sf.total)}`;
+    tile.classList.add(pnl > 0 ? "pos" : pnl < 0 ? "neg" : "hl");
+  }else{
+    $("vPnl").textContent = "—";
+    $("tRet").textContent = hasBuy ? "Enter a sell price" : "Enter buy price and quantity";
+  }
+  if(hasBuy){
+    const be = breakEven(cashOut, shares, opt);
+    $("vBe").textContent = be ? price(be) : "—";
+    $("sBe").textContent = be ? `Min. tradable: ${price(roundUpTick(be))} · +${fmt((be / bp.v - 1) * 100, 2)}% from buy` : "Covers buy + sell fees";
+  }else{
+    $("vBe").textContent = "—"; $("sBe").textContent = "Covers buy + sell fees";
+  }
+
+  // Hints / warnings
+  $("qtyHint").textContent = state.market === "bursa"
+    ? (shares > 0 ? `${qtyFmt(shares / 100)} lot${shares === 100 ? "" : "s"} · 1 lot = 100` : "1 lot = 100 shares")
+    : (shares > 0 && shares < 1 ? "Fractional order (< 1 share)" : "Fractional allowed");
+  const notes = [];
+  if(state.market === "bursa" && shares > 0 && shares % 100 !== 0) notes.push("Bursa normal board trades in lots of 100; odd lots go to the odd-lot market.");
+  if(state.market === "us" && !(opt.fx > 0)) notes.push("Enter a valid USD/MYR rate — Malaysian stamp duty on US trades cannot be computed without it.");
+  if(state.market === "us" && shares > 0 && shares < 1) notes.push("Order < 1 share: platform fee is % based; settlement, SEC and TAF are not charged.");
+  if(![bp, q, sp].every(x => x.ok)) notes.push("Some inputs are invalid — use positive numbers only.");
+  showNote("tradeNote", notes, state.market === "us" && !(opt.fx > 0) || ![bp, q, sp].every(x => x.ok));
+}
+
+function calcAvg(opt){
+  const ca = readNum("curAvg"), cq = readNum("curQty"), np = readNum("addPrice"), aq = readNum("addQty");
+  const curCost = round2(ca.v * cq.v);
+  const addValue = round2(np.v * aq.v);
+  const f = fees(addValue, aq.v, "buy", opt);
+  const addCash = round2(addValue + f.total);
+  const totQty = cq.v + aq.v;
+  const totCost = round2(curCost + addCash);
+
+  $("vCurCost").textContent = curCost > 0 ? money(curCost) : "—";
+  $("vAddCash").textContent = addValue > 0 ? money(addCash) : "—";
+  $("vTotQty").textContent = qtyFmt(totQty);
+  $("vTotCost").textContent = totCost > 0 ? money(totCost) : "—";
+  if(totQty > 0 && totCost > 0){
+    const avg = totCost / totQty;
+    $("vAvg").textContent = price(avg);
+    // Green when the new average sits below the new buy price (≈ market): the whole position is in profit at that price.
+    const inProfit = np.v > 0 && avg < np.v;
+    $("tAvg").className = "tile main " + (inProfit ? "pos" : "hl");
+    const parts = [];
+    if(ca.v > 0) parts.push(`${avg <= ca.v ? "▼" : "▲"} ${fmt(Math.abs(avg / ca.v - 1) * 100, 2)}% vs current avg`);
+    if(np.v > 0) { const g = (np.v / avg - 1) * 100; parts.push(`position ${g >= 0 ? "+" : "−"}${fmt(Math.abs(g), 2)}% at new buy price`); }
+    parts.push("incl. new buy fees");
+    $("sAvg").textContent = parts.join(" · ");
+  }else{
+    $("tAvg").className = "tile main hl";
+    $("vAvg").textContent = "—"; $("sAvg").textContent = "Incl. new buy fees";
+  }
+
+  const body = $("avgRows"); body.replaceChildren();
+  const has = addValue > 0;
+  const trV = el("tr"); trV.append(labelCell("Trade value"), valCell(addValue, has)); body.append(trV);
+  for(const [key, label, note] of rowDefs()){
+    if(key === "sec" || key === "taf") continue;
+    const tr = el("tr"); tr.append(labelCell(label, note), valCell(f.lines[key] || 0, has)); body.append(tr);
+  }
+  const trT = el("tr", "sum"); trT.append(labelCell("Total fees"), valCell(f.total, has)); body.append(trT);
+
+  const notes = ["Enter your current average as shown in Moomoo (it already includes past buy fees if you use \"average cost\")."];
+  const bad = ![ca, cq, np, aq].every(x => x.ok);
+  if(bad) notes.unshift("Some inputs are invalid — use positive numbers only.");
+  if(state.market === "us" && !(opt.fx > 0)) notes.unshift("Enter a valid USD/MYR rate for stamp duty.");
+  showNote("avgNote", notes, bad || (state.market === "us" && !(opt.fx > 0)));
+}
+
+function showNote(id, notes, warn){
+  const n = $(id);
+  n.hidden = notes.length === 0;
+  n.classList.toggle("warn", !!warn);
+  n.textContent = notes.join(" ");
+}
+
+/* ---------- Rules & editable rates ---------- */
+function renderRules(){
+  const r = state.rates[state.market];
+  const items = state.market === "bursa" ? [
+    `Brokerage ${r.commPct}% of value, rounded up to the nearest sen, no minimum.`,
+    `Platform fee RM${fmt(r.platform,2)} per executed order.`,
+    `Clearing fee ${r.clearPct}% of value, capped at RM${fmt(r.clearCap,0)}.`,
+    `Stamp duty RM${r.stampPer1k} per RM1,000 or part thereof, capped at RM${fmt(r.stampCap,0)}. Bursa-listed ETFs exempt until 31 Dec 2028.`,
+    `SST ${r.sstPct}% (from 1 Oct 2025) on brokerage, platform and clearing fees for ETFs, REITs, warrants, rights, business trusts and stapled securities. Ordinary shares exempt.`,
+    `Fees are identical on buy and sell.`
+  ] : [
+    `Commission ${r.commPct}% of value. Platform fee $${r.platform} per order.`,
+    `Orders under 1 share: platform fee ${r.fracPlatPct}% of value, max $${r.fracPlatCap}; no settlement, SEC or TAF.`,
+    `Settlement $${r.settle}/share, capped at ${r.settleCapPct}% of value (buy and sell).`,
+    `SEC fee (sell only) $${r.secPerM} per $1m sold, min $${r.secMin} — resumed 4 Apr 2026.`,
+    `FINRA TAF (sell only) $${r.taf}/share, min $${r.tafMin}, max $${r.tafMax}.`,
+    `CAT fee (buy and sell) per share: NYSE/Nasdaq-listed (NMS) $${r.catNms}; over-the-counter (OTC) $${r.catOtc}.`,
+    `Malaysian stamp duty RM${r.stampPer1k} per RM1,000 or part, max RM${fmt(r.stampCap,0)}, computed in MYR and charged in USD. FX auto-fills from the ECB reference rate (Frankfurter); Moomoo uses its own rate, so small differences are possible.`,
+    `SST is not applied by default; tick "Add 8% SST" if your contract note shows it.`
+  ];
+  const ul = $("rules"); ul.replaceChildren(...items.map(t => el("li", null, t)));
+
+  const box = $("rateFields"); box.replaceChildren();
+  for(const [key, label] of RATE_FIELDS[state.market]){
+    const wrap = el("div");
+    const id = "rate_" + key;
+    const lab = el("label", null, label); lab.htmlFor = id;
+    const inp = el("input"); inp.id = id; inp.inputMode = "decimal"; inp.autocomplete = "off";
+    inp.value = String(r[key]);
+    inp.addEventListener("input", () => {
+      const raw = inp.value.trim();
+      const v = Number(raw);
+      const ok = raw !== "" && Number.isFinite(v) && v >= 0;
+      inp.classList.toggle("bad", !ok);
+      if(ok){ state.rates[state.market][key] = v; update(false); }
+    });
+    wrap.append(lab, inp); box.append(wrap);
+  }
+}
+
+/* ---------- UI wiring ---------- */
+function applyMode(){
+  const us = state.market === "us";
+  document.querySelectorAll("[data-market]").forEach(b => b.setAttribute("aria-selected", String(b.dataset.market === state.market)));
+  document.querySelectorAll("[data-calc]").forEach(b => b.setAttribute("aria-selected", String(b.dataset.calc === state.calc)));
+  $("pTrade").hidden = state.calc !== "trade";
+  $("pAvg").hidden = state.calc !== "avg";
+  $("optBursa").hidden = us;
+  $("optUsType").hidden = !us;
+  $("optUsFx").hidden = !us;
+  $("usSstWrap").hidden = !us;
+  const c = us ? "USD" : "RM";
+  document.querySelectorAll("label.cur").forEach(l => {
+    l.textContent = l.textContent.replace(/ \((RM|USD)\)/, "").replace(/( \(optional\))?$/, m => ` (${c})${m}`);
+  });
+  ["buyPrice","sellPrice","curAvg","addPrice"].forEach(id => $(id).placeholder = us ? "0.00" : "0.000");
+}
+
+function update(rerenderRules = true){
+  if(rerenderRules) renderRules();
+  const opt = options();
+  calcTrade(opt);
+  calcAvg(opt);
+  save();
+}
+
+document.querySelectorAll("[data-market]").forEach(b => b.addEventListener("click", () => {
+  if(state.market === b.dataset.market) return;
+  state.market = b.dataset.market;
+  // Prices are market-specific; clear them to avoid mixing RM and USD.
+  ["buyPrice","sellPrice","qty","curAvg","curQty","addPrice","addQty"].forEach(id => { $(id).value = ""; $(id).classList.remove("bad"); });
+  applyMode(); update();
+}));
+document.querySelectorAll("[data-calc]").forEach(b => b.addEventListener("click", () => {
+  state.calc = b.dataset.calc; applyMode(); update(false);
+}));
+["buyPrice","qty","sellPrice","curAvg","curQty","addPrice","addQty"].forEach(id => $(id).addEventListener("input", () => update(false)));
+$("fx").addEventListener("input", () => { fx.mode = "manual"; showFxState(); update(false); });
+$("fxRefresh").addEventListener("click", () => { fx.mode = "live"; fetchFx(true); });
+["bursaType","usType","promo","usSst"].forEach(id => $(id).addEventListener("change", () => update()));
+$("resetRates").addEventListener("click", () => { state.rates[state.market] = clone(DEFAULTS[state.market]); update(); });
+
+// Expose pure engines for automated tests only.
+window.__feeCalc = { bursaFees, usFees, breakEven, roundUpTick, state, DEFAULTS };
+
+load();
+applyMode();
+update();
+showFxState();
+if(fx.mode === "live") fetchFx(false);
+})();
+</script>
+</body>
+</html>
