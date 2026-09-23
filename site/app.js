@@ -138,9 +138,9 @@ function rowDefs(){
   if(state.market === "bursa"){
     const t = $("bursaType").value;
     return [
-      ["commission","Brokerage", `${r.commPct}%, rounded up to 1 sen${$("promo").checked ? " · promo 0%" : ""}`],
+      ["commission","Brokerage", `${r.commPct}%, rounded to nearest sen${$("promo").checked ? " · promo 0%" : ""}`],
       ["platform","Platform fee", `RM${fmt(r.platform,2)} per order`],
-      ["clearing","Clearing fee", `${r.clearPct}%, max RM${fmt(r.clearCap,0)}`],
+      ["clearing","Clearing fee", `${r.clearPct}%, rounded up, max RM${fmt(r.clearCap,0)}`],
       ["stamp","Stamp duty", t === "etf" ? "ETF exempt (to 31 Dec 2028)" : `RM${r.stampPer1k} per RM1,000 or part, max RM${fmt(r.stampCap,0)}`],
       ...(FE.SST_BURSA.includes(t) ? [["sst","SST", `${r.sstPct}% on brokerage, platform & clearing`]] : [])
     ];
@@ -298,9 +298,9 @@ function showNote(id, notes, warn){
 function renderRules(){
   const r = state.rates[state.market];
   const items = state.market === "bursa" ? [
-    `Brokerage ${r.commPct}% of value, rounded up to the nearest sen, no minimum.`,
+    `Brokerage ${r.commPct}% of value, rounded to the nearest sen, no minimum.`,
     `Platform fee RM${fmt(r.platform,2)} per executed order.`,
-    `Clearing fee ${r.clearPct}% of value, capped at RM${fmt(r.clearCap,0)}.`,
+    `Clearing fee ${r.clearPct}% of value, rounded up to the next sen, capped at RM${fmt(r.clearCap,0)}.`,
     `Stamp duty RM${r.stampPer1k} per RM1,000 or part thereof, capped at RM${fmt(r.stampCap,0)}. Bursa-listed ETFs exempt until 31 Dec 2028.`,
     `SST ${r.sstPct}% (from 1 Oct 2025) on brokerage, platform and clearing fees for ETFs, REITs, warrants, rights, business trusts and stapled securities. Ordinary shares exempt.`,
     `Fees are identical on buy and sell.`

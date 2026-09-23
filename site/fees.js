@@ -11,9 +11,9 @@ const RATES_AS_OF = "2026-09";
 
 const DEFAULTS = Object.freeze({
   bursa: Object.freeze({
-    commPct: 0.03,      // % of value, rounded UP to RM0.01, no minimum
+    commPct: 0.03,      // % of value, rounded to nearest RM0.01, no minimum
     platform: 3,        // RM per order
-    clearPct: 0.03,     // % of value
+    clearPct: 0.03,     // % of value, rounded UP to RM0.01
     clearCap: 1000,     // RM
     stampPer1k: 1,      // RM per RM1,000 or part thereof
     stampCap: 1000,     // RM
@@ -42,6 +42,7 @@ const DEFAULTS = Object.freeze({
 /* When each rate took effect, and whether it is confirmed. Update here when a rate changes. */
 const RATE_NOTES = Object.freeze({
   bursa: Object.freeze({
+    commPct: "Rounding verified against Moomoo trades (Aug 2026, Jun 2025)",
     stampPer1k: "RM1 per RM1,000, cap RM1,000 — from 1 Jan 2024",
     sstPct: "8% SST on non-ordinary products — from 1 Oct 2025"
   }),
@@ -70,9 +71,10 @@ const sum = o => Object.values(o).reduce((a, b) => a + b, 0);
  */
 function bursaFees(value, opt, r) {
   if (!(value > 0)) return { lines: {}, total: 0 };
-  const commission = opt.promo ? 0 : ceil2(value * r.commPct / 100);
+  // Rounding verified against real Moomoo MY trades: brokerage to nearest sen, clearing up to next sen.
+  const commission = opt.promo ? 0 : round2(value * r.commPct / 100);
   const platform = r.platform;
-  const clearing = round2(Math.min(value * r.clearPct / 100, r.clearCap));
+  const clearing = Math.min(ceil2(value * r.clearPct / 100), r.clearCap);
   const stamp = opt.type === "etf" ? 0 : Math.min(Math.ceil(value / 1000 - EPS) * r.stampPer1k, r.stampCap);
   const sst = SST_BURSA.includes(opt.type) ? round2((commission + platform + clearing) * r.sstPct / 100) : 0;
   const lines = { commission, platform, clearing, stamp, sst };
