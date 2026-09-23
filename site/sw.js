@@ -2,16 +2,22 @@
  * Service worker: offline support only.
  * - Handles same-origin GET requests; everything else (incl. the FX API) goes straight to the network, never cached.
  * - Network-first, so a deployed fix reaches users on their next online visit; cache is the offline fallback.
+ * - Network requests bypass the browser HTTP cache (revalidate via ETag), because GitHub Pages sends
+ *   max-age=600 and would otherwise serve files up to 10 minutes stale after a deploy.
  */
 "use strict";
-const CACHE = "fee-calc-v1";
+const CACHE = "fee-calc-v2";
 const SHELL = [
   "./", "index.html", "styles.css", "fees.js", "app.js", "manifest.webmanifest",
   "icon.svg", "icon-180.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"
 ];
 
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches.open(CACHE)
+      .then(c => c.addAll(SHELL.map(u => new Request(u, { cache: "no-cache" }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", event => {
@@ -28,7 +34,7 @@ self.addEventListener("fetch", event => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
   event.respondWith(
-    fetch(req)
+    fetch(req, { cache: "no-cache" })
       .then(res => {
         if (res.ok && res.type === "basic") {
           const copy = res.clone();
