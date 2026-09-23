@@ -1,7 +1,7 @@
 {
-  "name": "Moomoo Fee Calculator",
+  "name": "Bursa & US Fee Calculator",
   "short_name": "Fee Calc",
-  "description": "Moomoo Malaysia fee calculator for Bursa and US stocks",
+  "description": "Independent fee and P/L calculator for Bursa Malaysia and US stocks. Not affiliated with Moomoo or Futu.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

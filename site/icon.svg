@@ -8,5 +8,5 @@
     <rect x="148" y="300" width="56" height="44" rx="10"/><rect x="228" y="300" width="56" height="44" rx="10"/>
     <rect x="148" y="364" width="136" height="28" rx="10" opacity=".35"/>
   </g>
-  <rect x="308" y="236" width="56" height="156" rx="10" fill="#ff6a00"/>
+  <rect x="308" y="236" width="56" height="156" rx="10" fill="#1f9d74"/>
 </svg>

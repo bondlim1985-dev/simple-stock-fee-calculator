@@ -1,6 +1,10 @@
-# Simple Stock Fee Calculator
+# Bursa & US Fee Calculator
 
-Mobile-friendly calculator for **Moomoo Malaysia** trading fees on Bursa Malaysia (MYR) and US (USD) stocks: trade P/L, break-even price and average cost, with every fee itemised. Installs to your phone's home screen and works offline.
+Independent, mobile-friendly calculator for trading fees on Bursa Malaysia (MYR) and US (USD) stocks, based on the **Moomoo Malaysia** fee schedule: trade P/L, break-even price and average cost, with every fee itemised. Installs to your phone's home screen and works offline.
+
+## Disclaimer
+
+Not affiliated with, endorsed by or connected to Moomoo, Futu or any broker. "Moomoo" is used only to identify whose published fee schedule the calculator follows. Results are estimates for information only, not financial or investment advice.
 
 ## Layout
 

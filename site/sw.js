@@ -6,7 +6,7 @@
  *   max-age=600 and would otherwise serve files up to 10 minutes stale after a deploy.
  */
 "use strict";
-const CACHE = "fee-calc-v2";
+const CACHE = "fee-calc-v3";
 const SHELL = [
   "./", "index.html", "styles.css", "fees.js", "app.js", "manifest.webmanifest",
   "icon.svg", "icon-180.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"
