@@ -49,9 +49,10 @@ const RATE_NOTES = Object.freeze({
   us: Object.freeze({
     secPerM: "SEC Section 31 rate — from 4 Apr 2026",
     taf: "FINRA TAF — from 1 Jan 2026",
-    catNms: "Unconfirmed — verify against a contract note",
-    fracPlatPct: "Unconfirmed — verify against a contract note",
-    sstPct: "US SST applied only when ticked — unconfirmed"
+    catNms: "Unconfirmed — not shown on 1-share orders; verify on a large order",
+    fracPlatPct: "USD0.99 cap verified (Aug 2026); the 0.99% rate itself is unconfirmed",
+    sstPct: "Not charged on US trades (verified Mar/Aug 2026) — leave unticked",
+    commPct: "0.03% and USD0.99 platform fee verified on a real 1-share buy (Mar 2026)"
   })
 });
 
@@ -92,7 +93,8 @@ function usFees(value, shares, side, opt, r) {
   if (!(value > 0) || !(shares > 0)) return { lines: {}, total: 0, frac: false };
   const frac = shares < 1;
   const sell = side === "sell";
-  const commission = opt.promo ? 0 : round2(value * r.commPct / 100);
+  // Orders < 1 share: no commission (verified on a real 0.3-share sell, Aug 2026).
+  const commission = opt.promo || frac ? 0 : round2(value * r.commPct / 100);
   const platform = frac ? round2(Math.min(value * r.fracPlatPct / 100, r.fracPlatCap)) : r.platform;
   // Orders < 1 share: no settlement, SEC or TAF.
   const settlement = frac ? 0 : round2(Math.min(shares * r.settle, value * r.settleCapPct / 100));
